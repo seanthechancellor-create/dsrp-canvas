@@ -1,0 +1,114 @@
+services:
+  # Knowledge Graph Database
+  typedb:
+    image: vaticle/typedb:2.28.0
+    ports:
+      - "1729:1729"
+    volumes:
+      - typedb_data:/opt/typedb-all-linux-x86_64/server/data
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'healthy'"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # Vector Database (PostgreSQL + pgvector)
+  postgres:
+    image: pgvector/pgvector:pg16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: dsrp
+      POSTGRES_PASSWORD: dsrp_password
+      POSTGRES_DB: dsrp_canvas
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dsrp -d dsrp_canvas"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Cache Layer
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - AI_PROVIDER=${AI_PROVIDER:-gemini}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - TYPEDB_HOST=typedb
+      - TYPEDB_PORT=1729
+      - POSTGRES_URL=postgresql://dsrp:dsrp_password@postgres:5432/dsrp_canvas
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+      - ./uploads:/app/uploads
+    depends_on:
+      typedb:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # MCP Server (for Claude Desktop integration)
+  mcp:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - TYPEDB_HOST=typedb
+      - TYPEDB_PORT=1729
+      - POSTGRES_URL=postgresql://dsrp:dsrp_password@postgres:5432/dsrp_canvas
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - backend
+    command: fastmcp run mcp/dsrp_server.py --transport sse --port 8001
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    command: npm run dev -- --host
+
+volumes:
+  typedb_data:
+  postgres_data:
+  redis_data:

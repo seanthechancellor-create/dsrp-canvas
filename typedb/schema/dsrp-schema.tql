@@ -1,0 +1,174 @@
+define
+
+# ============================================================================
+# DSRP Knowledge Graph Schema
+# Based on DSRP Theory (Distinctions, Systems, Relationships, Perspectives)
+# 4 Patterns, 8 Elements, 3 Dynamics
+# ============================================================================
+
+# --- Core Concept Entity ---
+concept sub entity,
+    owns concept-id @key,
+    owns name,
+    owns description,
+    owns created-at,
+    owns updated-at,
+    plays distinction:identity,
+    plays distinction:other,
+    plays system-structure:whole,
+    plays system-structure:part,
+    plays relationship-link:action,
+    plays relationship-link:reaction,
+    plays perspective-view:point,
+    plays perspective-view:view,
+    plays analysis:subject;
+
+# --- Source Material Entity ---
+source sub entity,
+    owns source-id @key,
+    owns source-type,  # pdf, video, audio
+    owns file-path,
+    owns original-filename,
+    owns extracted-text,
+    owns created-at,
+    plays extraction:source-material,
+    plays analysis:source-reference;
+
+# --- DSRP Analysis Entity ---
+dsrp-analysis sub entity,
+    owns analysis-id @key,
+    owns pattern-type,  # D, S, R, P
+    owns element-type,  # i, o, p, w, a, r, point, view
+    owns move-type,     # is-is-not, zoom-in, zoom-out, part-party, rds-barbell, p-circle
+    owns reasoning,
+    owns confidence-score,
+    owns created-at,
+    plays analysis:result;
+
+# --- Canvas Note Entity (for UI) ---
+canvas-note sub entity,
+    owns note-id @key,
+    owns canvas-x,
+    owns canvas-y,
+    owns canvas-scale,
+    owns note-content,
+    owns note-color,
+    owns created-at,
+    plays note-link:note,
+    plays note-link:linked-concept;
+
+# ============================================================================
+# DSRP Pattern Relations (The 4 Patterns)
+# ============================================================================
+
+# D - Distinction: identity/other
+distinction sub relation,
+    owns distinction-id @key,
+    owns distinction-label,
+    relates identity,
+    relates other;
+
+# S - System: part/whole
+system-structure sub relation,
+    owns system-id @key,
+    owns system-label,
+    relates whole,
+    relates part;
+
+# R - Relationship: action/reaction
+relationship-link sub relation,
+    owns relationship-id @key,
+    owns relationship-label,
+    owns relationship-type,  # causal, correlative, structural, etc.
+    relates action,
+    relates reaction;
+
+# P - Perspective: point/view
+perspective-view sub relation,
+    owns perspective-id @key,
+    owns perspective-label,
+    relates point,   # the observer
+    relates view;    # what is observed
+
+# ============================================================================
+# Supporting Relations
+# ============================================================================
+
+# Links sources to extracted concepts
+extraction sub relation,
+    owns extraction-id @key,
+    owns extraction-method,
+    owns page-number,
+    owns timestamp-start,
+    owns timestamp-end,
+    relates source-material,
+    relates extracted as concept;
+
+# Links concepts to their DSRP analyses
+analysis sub relation,
+    owns analysis-link-id @key,
+    relates subject as concept,
+    relates source-reference as source,
+    relates result as dsrp-analysis;
+
+# Links canvas notes to concepts
+note-link sub relation,
+    owns note-link-id @key,
+    relates note as canvas-note,
+    relates linked-concept as concept;
+
+# ============================================================================
+# Attributes
+# ============================================================================
+
+# IDs
+concept-id sub attribute, value string;
+source-id sub attribute, value string;
+analysis-id sub attribute, value string;
+note-id sub attribute, value string;
+distinction-id sub attribute, value string;
+system-id sub attribute, value string;
+relationship-id sub attribute, value string;
+perspective-id sub attribute, value string;
+extraction-id sub attribute, value string;
+analysis-link-id sub attribute, value string;
+note-link-id sub attribute, value string;
+
+# Content
+name sub attribute, value string;
+description sub attribute, value string;
+extracted-text sub attribute, value string;
+note-content sub attribute, value string;
+reasoning sub attribute, value string;
+
+# Classification
+source-type sub attribute, value string;
+pattern-type sub attribute, value string;
+element-type sub attribute, value string;
+move-type sub attribute, value string;
+relationship-type sub attribute, value string;
+extraction-method sub attribute, value string;
+
+# File info
+file-path sub attribute, value string;
+original-filename sub attribute, value string;
+
+# Canvas positioning
+canvas-x sub attribute, value double;
+canvas-y sub attribute, value double;
+canvas-scale sub attribute, value double;
+note-color sub attribute, value string;
+
+# Labels
+distinction-label sub attribute, value string;
+system-label sub attribute, value string;
+relationship-label sub attribute, value string;
+perspective-label sub attribute, value string;
+
+# Metadata
+confidence-score sub attribute, value double;
+page-number sub attribute, value long;
+timestamp-start sub attribute, value double;
+timestamp-end sub attribute, value double;
+created-at sub attribute, value datetime;
+updated-at sub attribute, value datetime;
