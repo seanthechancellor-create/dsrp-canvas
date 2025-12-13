@@ -78,8 +78,9 @@ export function DSRPPanel({ onAnalysisComplete, onClear, drillDownConcept, initi
   }, [result, selectedConcept, onAnalysisComplete])
 
   const handleAnalyze = async () => {
-    if (selectedConcept && selectedMove) {
-      await analyze(selectedConcept, selectedMove)
+    const concept = selectedConcept.trim()
+    if (concept && selectedMove) {
+      await analyze(concept, selectedMove)
     }
   }
 
@@ -162,8 +163,9 @@ export function DSRPPanel({ onAnalysisComplete, onClear, drillDownConcept, initi
             className={`concept-input ${isAnalyzing ? 'analyzing' : ''}`}
             disabled={isAnalyzing}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && selectedConcept && !isAnalyzing) {
+              if (e.key === 'Enter' && selectedConcept.trim() && !isAnalyzing) {
                 e.preventDefault()
+                e.stopPropagation()
                 handleAnalyze()
               }
             }}

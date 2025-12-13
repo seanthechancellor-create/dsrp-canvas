@@ -49,18 +49,23 @@ export function Sidebar({ onConceptSelect }: SidebarProps) {
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true) }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
+        onClick={() => document.getElementById('file-upload')?.click()}
       >
         <input
           type="file"
           id="file-upload"
           multiple
-          accept=".pdf,.mp3,.wav,.mp4,.webm"
+          accept=".pdf,.mp3,.wav,.mp4,.webm,.mov,.avi,.ogg,.m4a"
           onChange={handleFileSelect}
           style={{ display: 'none' }}
         />
-        <label htmlFor="file-upload">
-          {isUploading ? 'Uploading...' : 'Drop PDF, Audio, or Video'}
-        </label>
+        <div className="upload-content">
+          <span className="upload-icon">📁</span>
+          <span className="upload-text">
+            {isUploading ? 'Uploading...' : 'Click to browse or drop files'}
+          </span>
+          <span className="upload-hint">PDF, Audio, Video</span>
+        </div>
       </div>
 
       <div className="sources-list">
@@ -145,6 +150,23 @@ export function Sidebar({ onConceptSelect }: SidebarProps) {
         .upload-zone:hover, .upload-zone.dragging {
           border-color: var(--color-accent);
           background: rgba(233, 69, 96, 0.1);
+        }
+        .upload-content {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 4px;
+        }
+        .upload-icon {
+          font-size: 1.5rem;
+        }
+        .upload-text {
+          font-size: 0.875rem;
+          color: var(--color-text);
+        }
+        .upload-hint {
+          font-size: 0.75rem;
+          color: var(--color-text-muted);
         }
         .sources-list {
           flex: 1;

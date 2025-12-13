@@ -66,7 +66,7 @@ async def extract_concepts(text: str, source_name: str | None = None) -> dict:
     agent = DSRPAgent()
     result = await agent.extract_concepts_from_text(
         text=text,
-        max_concepts=10,
+        max_concepts=20,
         source_name=source_name,
     )
     return result
