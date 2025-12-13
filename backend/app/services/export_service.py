@@ -11,7 +11,15 @@ from app.services.typedb_service import get_typedb_service
 logger = logging.getLogger(__name__)
 
 # Fallback in-memory stores (used when TypeDB unavailable)
-concepts_db: dict[str, dict] = {}
+# Import from concepts API to share the same store
+def _get_concepts_db():
+    """Get the shared concepts db from the concepts API module."""
+    try:
+        from app.api.concepts import concepts_db
+        return concepts_db
+    except ImportError:
+        return {}
+
 analyses_db: dict[str, list[dict]] = {}
 
 
@@ -38,7 +46,7 @@ async def export_to_markdown(
 
         # Fallback to in-memory
         if not concept:
-            concept = concepts_db.get(concept_id, {"name": "Unknown", "description": ""})
+            concept = _get_concepts_db().get(concept_id, {"name": "Unknown", "description": ""})
         if not analyses and include_analyses:
             analyses = analyses_db.get(concept_id, [])
 
@@ -84,7 +92,7 @@ async def export_to_obsidian(
 
         # Fallback to in-memory
         if not concept:
-            concept = concepts_db.get(concept_id, {"name": "Unknown", "description": ""})
+            concept = _get_concepts_db().get(concept_id, {"name": "Unknown", "description": ""})
         if not analyses and include_analyses:
             analyses = analyses_db.get(concept_id, [])
 
@@ -154,7 +162,7 @@ async def export_to_remnote(
 
         # Fallback to in-memory
         if not concept:
-            concept = concepts_db.get(concept_id, {"name": "Unknown"})
+            concept = _get_concepts_db().get(concept_id, {"name": "Unknown"})
         if not analyses:
             analyses = analyses_db.get(concept_id, [])
 

@@ -129,7 +129,8 @@ class TestDSRPAgent:
 
         agent = DSRPAgent()
         assert agent is not None
-        assert agent.model == "claude-sonnet-4-20250514"
+        assert agent.providers is not None
+        assert "gemini" in agent.providers or "claude" in agent.providers or "openai" in agent.providers
 
     def test_agent_move_prompts(self):
         """Test all moves have prompt templates."""

@@ -1,7 +1,7 @@
 import logging
 import uuid
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body, Query
 from pydantic import BaseModel
 
 from agents.dsrp_agent import DSRPAgent
@@ -217,7 +217,10 @@ async def _store_related_concepts(typedb, concept_id: str, result: dict):
 
 
 @router.post("/batch")
-async def batch_analyze(concepts: list[str], moves: list[str] | None = None):
+async def batch_analyze(
+    concepts: list[str] = Body(...),
+    moves: list[str] | None = Query(default=None),
+):
     """Analyze multiple concepts with all or specified moves."""
     moves = moves or ["is-is-not", "zoom-in", "zoom-out", "part-party", "rds-barbell", "p-circle"]
     results = []
