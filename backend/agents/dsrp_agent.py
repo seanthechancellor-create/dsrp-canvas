@@ -239,8 +239,51 @@ class GeminiProvider(BaseAIProvider):
         if not self._available:
             raise RuntimeError("Gemini provider not available")
 
-        response = self.model.generate_content(user_prompt)
-        return response.text
+        import time
+        import random
+        
+        max_retries = 5
+        base_delay = 2  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                # Add a small system prompt hint to ensure JSON if missing
+                full_prompt = f"{user_prompt}\n\nIMPORTANT: Return ONLY valid JSON."
+                
+                response = self.model.generate_content(full_prompt)
+                return response.text
+                
+            except Exception as e:
+                error_str = str(e).lower()
+                is_rate_limit = "429" in error_str or "quota" in error_str or "resource exhausted" in error_str
+                
+                if is_rate_limit and attempt < max_retries - 1:
+                    delay = (base_delay * (2 ** attempt)) + (random.random() * 1)
+                    logger.warning(f"Gemini rate limit hit. Retrying in {delay:.2f}s... (Attempt {attempt+1}/{max_retries})")
+                    # Ideally use asyncio.sleep but this is sync call in async wrapper for now, 
+                    # genai library is sync unless using async_generate_content. 
+                    # Assuming we can block this thread or use asyncio.sleep if the method is async.
+                    # The method signature is async def generate, but generate_content is sync blocking usually.
+                    # We should use time.sleep for blockage if the library is blocking, or better yet switch to async if possible.
+                    # For now, to keep it simple and safe within this structure:
+                    time.sleep(delay)
+                    continue
+                
+                if attempt == max_retries - 1:
+                    logger.error(f"Gemini generation failed after {max_retries} attempts: {e}")
+                    # Return a friendly JSON error if possible so frontend doesn't crash
+                    if is_rate_limit:
+                         # Fail gracefully with a JSON that informs the user
+                         return json.dumps({
+                             "error": "RateLimitError",
+                             "message": "AI quota exceeded. Please wait a moment and try again.",
+                             "pattern": "Error",
+                             "elements": {},
+                             "move": "error",
+                             "related_concepts": []
+                         })
+                    raise e
+        return ""
 
 
 class ClaudeProvider(BaseAIProvider):

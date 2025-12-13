@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useDSRPAnalysis } from '../hooks/useDSRPAnalysis'
 import { useExport } from '../hooks/useExport'
 import { useConceptStore } from '../stores/conceptStore'
+
 
 interface AnalysisResult {
   pattern: string
@@ -43,9 +44,13 @@ export function DSRPPanel({ onAnalysisComplete, onClear, drillDownConcept, initi
   const [selectedMove, setSelectedMove] = useState<string>(initialMove || 'is-is-not')
   const [selectedConcept, setSelectedConcept] = useState<string>('')
 
-  const { analyze, isAnalyzing, result } = useDSRPAnalysis()
+  const { analyze, isAnalyzing, result, error } = useDSRPAnalysis()
   const { exportToMarkdown, downloadFile, isExporting } = useExport()
   const { concepts, fetchConcepts } = useConceptStore()
+
+  // Track analyzing state for async checks (timeout closures)
+  const isAnalyzingRef = useRef(isAnalyzing)
+  useEffect(() => { isAnalyzingRef.current = isAnalyzing }, [isAnalyzing])
 
   useEffect(() => {
     fetchConcepts()
@@ -58,12 +63,27 @@ export function DSRPPanel({ onAnalysisComplete, onClear, drillDownConcept, initi
     }
   }, [initialMove])
 
+  // Auto-analyze when move changes (if concept is present and valid)
+  useEffect(() => {
+    if (selectedConcept && selectedConcept.trim().length > 0) {
+      const timer = setTimeout(() => {
+        if (!isAnalyzingRef.current) {
+          console.log('Auto-analyzing due to move change:', { concept: selectedConcept, move: selectedMove })
+          analyze(selectedConcept, selectedMove)
+        }
+      }, 1000) // Increase debounce to 1s to prevent API quota exhaustion
+      return () => clearTimeout(timer)
+    }
+  }, [selectedMove])
+
   // Handle drill-down: auto-fill concept and trigger analysis
   useEffect(() => {
-    if (drillDownConcept && drillDownConcept !== selectedConcept) {
+    if (drillDownConcept) {
+      console.log('Drill-down triggered for:', drillDownConcept)
       setSelectedConcept(drillDownConcept)
-      // Trigger analysis after a brief delay to allow state to update
+
       const timer = setTimeout(() => {
+        console.log('Auto-analyzing drill-down concept:', drillDownConcept)
         analyze(drillDownConcept, selectedMove)
       }, 100)
       return () => clearTimeout(timer)
@@ -78,9 +98,13 @@ export function DSRPPanel({ onAnalysisComplete, onClear, drillDownConcept, initi
   }, [result, selectedConcept, onAnalysisComplete])
 
   const handleAnalyze = async () => {
+    if (isAnalyzing) return
     const concept = selectedConcept.trim()
+    console.log('Manual analysis triggered:', { concept, move: selectedMove })
     if (concept && selectedMove) {
       await analyze(concept, selectedMove)
+    } else {
+      console.warn('Analysis skipped: missing concept or move', { concept, selectedMove })
     }
   }
 
@@ -162,20 +186,45 @@ export function DSRPPanel({ onAnalysisComplete, onClear, drillDownConcept, initi
             onChange={(e) => setSelectedConcept(e.target.value)}
             className={`concept-input ${isAnalyzing ? 'analyzing' : ''}`}
             disabled={isAnalyzing}
-            onKeyDown={(e) => {
+            onKeyUp={(e) => {
               if (e.key === 'Enter' && selectedConcept.trim() && !isAnalyzing) {
-                e.preventDefault()
-                e.stopPropagation()
                 handleAnalyze()
               }
             }}
           />
           {isAnalyzing && <div className="input-spinner" />}
         </div>
+        <button
+          className="analyze-btn"
+          onClick={handleAnalyze}
+          disabled={isAnalyzing || !selectedConcept.trim()}
+        >
+          {isAnalyzing ? 'Analyzing...' : 'Analyze'}
+        </button>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="error-message" style={{ color: '#ff6b6b', fontSize: '12px', marginBottom: '10px', textAlign: 'center' }}>
+          {error}
+        </div>
+      )}
 
       {/* Actions */}
       <div className="section actions">
+        <button
+          className="action-btn analyze"
+          onClick={handleAnalyze}
+          disabled={isAnalyzing || !selectedConcept.trim()}
+          style={{
+            borderColor: '#e94560',
+            color: '#e94560',
+            fontWeight: 'bold',
+            flex: 2
+          }}
+        >
+          {isAnalyzing ? 'Analyzing...' : 'Analyze AI'}
+        </button>
         <button className="action-btn" onClick={handleExport} disabled={isExporting}>
           Export
         </button>
@@ -318,6 +367,25 @@ export function DSRPPanel({ onAnalysisComplete, onClear, drillDownConcept, initi
         }
         @keyframes spin {
           to { transform: translateY(-50%) rotate(360deg); }
+        }
+        .analyze-btn {
+          width: 100%;
+          padding: 10px;
+          background: #e94560;
+          border: none;
+          border-radius: 4px;
+          color: #fff;
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .analyze-btn:hover:not(:disabled) {
+          background: #d63850;
+        }
+        .analyze-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
         }
         .actions {
           display: flex;

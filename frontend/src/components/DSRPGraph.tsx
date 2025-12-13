@@ -49,10 +49,8 @@ interface DSRPGraphProps {
   showConceptMap?: boolean
 }
 
-interface TooltipState {
+interface SelectionState {
   visible: boolean
-  x: number
-  y: number
   title: string
   content: string
 }
@@ -60,13 +58,17 @@ interface TooltipState {
 export function DSRPGraph({ concept, result, onNodeClick, conceptMap, showConceptMap }: DSRPGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const graphRef = useRef<Graph | null>(null)
-  const [tooltip, setTooltip] = useState<TooltipState>({
+  const [selection, setSelection] = useState<SelectionState>({
     visible: false,
-    x: 0,
-    y: 0,
     title: '',
     content: '',
   })
+
+  // Resizing state
+  const [panelHeight, setPanelHeight] = useState(250)
+  const [isResizing, setIsResizing] = useState(false)
+
+  // ... (buildGraphData and useEffect logic remains mostly the same, ensuring they don't break) ...
 
   // Build graph data from analysis result
   const buildGraphData = useCallback(() => {
@@ -412,7 +414,7 @@ export function DSRPGraph({ concept, result, onNodeClick, conceptMap, showConcep
         console.error('G6 render error:', err)
       })
 
-      // Node click handler - show tooltip and allow drill-down
+      // Node click handler - update panel selection
       graph.on('node:click', (evt: any) => {
         // G6 v5 uses different event structure
         const nodeId = evt.targetType === 'node' ? evt.target?.id : null
@@ -427,22 +429,13 @@ export function DSRPGraph({ concept, result, onNodeClick, conceptMap, showConcep
           return
         }
 
-        const rect = container.getBoundingClientRect()
-        // G6 v5 event coordinates
-        const clientX = evt.client?.x ?? evt.originalEvent?.clientX ?? 200
-        const clientY = evt.client?.y ?? evt.originalEvent?.clientY ?? 200
-        const x = clientX - rect.left
-        const y = clientY - rect.top
-
         const title = nodeData.data?.fullLabel || nodeData.data?.label || nodeId
         const content = nodeData.data?.fullText || nodeData.data?.fullLabel || 'No details available'
 
         console.log('Node clicked:', { nodeId, title, content: content.slice(0, 100) })
 
-        setTooltip({
+        setSelection({
           visible: true,
-          x: Math.max(10, Math.min(x, rect.width - 300)),
-          y: Math.max(10, Math.min(y, rect.height - 200)),
           title,
           content,
         })
@@ -473,20 +466,70 @@ export function DSRPGraph({ concept, result, onNodeClick, conceptMap, showConcep
     }
   }, [concept, result, buildGraphData, showConceptMap])
 
+  // Resize handling
+  const startResizing = useCallback(() => {
+    setIsResizing(true)
+  }, [])
+
+  const stopResizing = useCallback(() => {
+    setIsResizing(false)
+  }, [])
+
+  const resize = useCallback(
+    (mouseMoveEvent: MouseEvent) => {
+      if (isResizing && containerRef.current) {
+        const totalHeight = containerRef.current.parentElement?.clientHeight || window.innerHeight
+        const newPanelHeight = totalHeight - mouseMoveEvent.clientY
+        // Min 100px, Max 80% of screen
+        if (newPanelHeight > 100 && newPanelHeight < totalHeight * 0.8) {
+          setPanelHeight(newPanelHeight)
+        }
+      }
+    },
+    [isResizing]
+  )
+
+  useEffect(() => {
+    window.addEventListener('mousemove', resize)
+    window.addEventListener('mouseup', stopResizing)
+    return () => {
+      window.removeEventListener('mousemove', resize)
+      window.removeEventListener('mouseup', stopResizing)
+    }
+  }, [resize, stopResizing])
+
+  // Force graph resize when panel height changes
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (graphRef.current && containerRef.current) {
+        graphRef.current.setSize(
+          containerRef.current.clientWidth,
+          containerRef.current.clientHeight
+        )
+        graphRef.current.fitView()
+      }
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [panelHeight, selection.visible])
+
   const handleDrillDown = () => {
-    if (onNodeClick && tooltip.title) {
-      onNodeClick('drill', tooltip.title)
-      setTooltip({ ...tooltip, visible: false })
+    if (onNodeClick && selection.title) {
+      onNodeClick('drill', selection.title)
+      setSelection({ ...selection, visible: false })
     }
   }
 
-  const closeTooltip = () => {
-    setTooltip({ ...tooltip, visible: false })
+  const closePanel = () => {
+    setSelection({ ...selection, visible: false })
   }
 
   return (
     <div className="dsrp-graph-wrapper">
-      <div ref={containerRef} className="dsrp-graph-canvas" />
+      <div
+        ref={containerRef}
+        className="dsrp-graph-canvas"
+        style={{ height: selection.visible ? `calc(100% - ${panelHeight}px)` : '100%' }}
+      />
 
       {!concept && !showConceptMap && (
         <div className="dsrp-empty-state">
@@ -494,28 +537,33 @@ export function DSRPGraph({ concept, result, onNodeClick, conceptMap, showConcep
         </div>
       )}
 
-      {/* Tooltip popup for full text */}
-      {tooltip.visible && (
+      {/* Details Panel */}
+      {selection.visible && (
         <div
-          className="node-tooltip"
-          style={{ left: Math.min(tooltip.x, 400), top: Math.min(tooltip.y, 300) }}
+          className="details-panel"
+          style={{ height: panelHeight }}
         >
-          <div className="tooltip-header">
-            <h4>{tooltip.title}</h4>
-            <button className="close-btn" onClick={closeTooltip}>×</button>
+          {/* Taco / Drag Handle */}
+          <div className="resize-handle" onMouseDown={startResizing}>
+            <div className="taco-grip" />
           </div>
-          <div className="tooltip-content">
-            <p>{tooltip.content}</p>
+
+          <div className="panel-header">
+            <h4>{selection.title}</h4>
+            <div className="panel-controls">
+              <button className="drill-btn" onClick={handleDrillDown}>
+                Analyze →
+              </button>
+              <button className="close-btn" onClick={closePanel}>×</button>
+            </div>
           </div>
-          <div className="tooltip-actions">
-            <button className="drill-btn" onClick={handleDrillDown}>
-              Analyze "{tooltip.title}" →
-            </button>
+          <div className="panel-content">
+            <p>{selection.content}</p>
           </div>
         </div>
       )}
 
-      <div className="dsrp-legend">
+      <div className="dsrp-legend" style={{ bottom: selection.visible ? `${panelHeight + 10}px` : '10px' }}>
         <div className="legend-section">
           <span className="legend-title">Patterns:</span>
           <span style={{ color: DSRP_COLORS.D.stroke }}>D</span>
@@ -539,11 +587,12 @@ export function DSRPGraph({ concept, result, onNodeClick, conceptMap, showConcep
           background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
           border-radius: 8px;
           overflow: hidden;
+          display: flex;
+          flex-direction: column;
         }
         .dsrp-graph-canvas {
           width: 100%;
-          height: 100%;
-          min-height: 400px;
+          transition: height 0.1s ease; /* Fast transition for resize */
         }
         .dsrp-empty-state {
           position: absolute;
@@ -555,79 +604,88 @@ export function DSRPGraph({ concept, result, onNodeClick, conceptMap, showConcep
           font-family: Calibri, -apple-system, sans-serif;
           font-size: 14px;
         }
-        .node-tooltip {
-          position: absolute;
+        .details-panel {
           background: white;
-          border-radius: 10px;
-          box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-          max-width: 350px;
-          min-width: 250px;
-          z-index: 1000;
-          font-family: Calibri, -apple-system, sans-serif;
-          animation: fadeIn 0.2s ease;
+          border-top: 1px solid #ccc;
+          box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+          display: flex;
+          flex-direction: column;
+          z-index: 100;
+          position: relative;
         }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(-5px); }
-          to { opacity: 1; transform: translateY(0); }
+        .resize-handle {
+          height: 12px;
+          width: 100%;
+          background: #f0f0f0;
+          cursor: row-resize;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-bottom: 1px solid #e0e0e0;
         }
-        .tooltip-header {
+        .resize-handle:hover {
+          background: #e0e0e0;
+        }
+        .taco-grip {
+          width: 40px;
+          height: 4px;
+          background: #ccc;
+          border-radius: 2px;
+        }
+        .panel-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 12px 15px;
-          border-bottom: 1px solid #eee;
+          padding: 8px 15px;
           background: #f8f9fa;
-          border-radius: 10px 10px 0 0;
+          border-bottom: 1px solid #eee;
         }
-        .tooltip-header h4 {
+        .panel-header h4 {
+          margin: 0;
+          font-size: 16px;
+          color: #333;
+        }
+        .panel-controls {
+          display: flex;
+          gap: 10px;
+          align-items: center;
+        }
+        .panel-content {
+          flex: 1;
+          padding: 15px;
+          overflow-y: auto;
+          font-family: Calibri, -apple-system, sans-serif;
+        }
+        .panel-content p {
           margin: 0;
           font-size: 14px;
-          font-weight: 600;
-          color: #333;
+          line-height: 1.6;
+          color: #444;
+          white-space: pre-wrap;
         }
         .close-btn {
           background: none;
           border: none;
-          font-size: 20px;
+          font-size: 24px;
           cursor: pointer;
           color: #999;
-          padding: 0;
           line-height: 1;
+          padding: 0 5px;
         }
         .close-btn:hover { color: #333; }
-        .tooltip-content {
-          padding: 12px 15px;
-          max-height: 200px;
-          overflow-y: auto;
-        }
-        .tooltip-content p {
-          margin: 0;
-          font-size: 13px;
-          line-height: 1.5;
-          color: #555;
-        }
-        .tooltip-actions {
-          padding: 10px 15px;
-          border-top: 1px solid #eee;
-          background: #f8f9fa;
-          border-radius: 0 0 10px 10px;
-        }
         .drill-btn {
-          width: 100%;
-          padding: 8px 12px;
+          padding: 6px 12px;
           background: #1976D2;
           color: white;
           border: none;
-          border-radius: 6px;
+          border-radius: 4px;
           cursor: pointer;
           font-size: 13px;
           font-weight: 500;
-          transition: background 0.2s;
         }
         .drill-btn:hover { background: #1565C0; }
         .dsrp-legend {
           position: absolute;
-          bottom: 10px;
           left: 10px;
           display: flex;
           gap: 20px;
@@ -637,6 +695,7 @@ export function DSRPGraph({ concept, result, onNodeClick, conceptMap, showConcep
           padding: 8px 14px;
           border-radius: 6px;
           box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+          transition: bottom 0.1s ease;
         }
         .legend-section {
           display: flex;
@@ -648,13 +707,22 @@ export function DSRPGraph({ concept, result, onNodeClick, conceptMap, showConcep
           color: #555;
         }
       `}</style>
-    </div>
+    </div >
   )
 }
 
-function extractConcepts(text: string, max: number = 4): string[] {
+function extractConcepts(text: unknown, max: number = 4): string[] {
   if (!text) return []
-  return text
+
+  // Handle array input (e.g. from JSON list)
+  if (Array.isArray(text)) {
+    return text.map(t => String(t)).slice(0, max)
+  }
+
+  // Handle number or other types
+  const str = String(text)
+
+  return str
     .split(/[,.\n;•\-:()]+/)
     .map(s => s.trim().replace(/^(it is |this is |a |an |the |and |or )/gi, ''))
     .filter(s => s.length >= 2 && s.length <= 25)
