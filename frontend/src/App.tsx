@@ -284,49 +284,52 @@ function AppContent() {
         }
         .view-controls {
           position: absolute;
-          top: 10px;
+          top: 12px;
           left: 50%;
           transform: translateX(-50%);
           display: flex;
-          gap: 8px;
+          gap: 4px;
           z-index: 100;
-          background: rgba(255,255,255,0.95);
-          padding: 6px;
+          background: rgba(22, 33, 62, 0.95);
+          padding: 4px;
           border-radius: 8px;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+          border: 1px solid rgba(255,255,255,0.1);
+          backdrop-filter: blur(8px);
         }
         .view-toggle {
-          padding: 8px 16px;
+          padding: 8px 14px;
           border: none;
           border-radius: 6px;
-          font-size: 13px;
+          font-size: 12px;
           font-weight: 500;
           cursor: pointer;
-          background: #e0e0e0;
-          color: #555;
-          transition: all 0.2s;
-          font-family: Calibri, -apple-system, sans-serif;
+          background: transparent;
+          color: rgba(255,255,255,0.6);
+          transition: all 0.15s;
+          font-family: 'IBM Plex Sans', -apple-system, sans-serif;
         }
         .view-toggle:hover {
-          background: #d0d0d0;
+          background: rgba(255,255,255,0.08);
+          color: rgba(255,255,255,0.9);
         }
         .view-toggle.active {
-          background: #1976D2;
+          background: #e94560;
           color: white;
         }
         .clear-map-btn {
           padding: 8px 12px;
           border: none;
           border-radius: 6px;
-          font-size: 13px;
+          font-size: 12px;
           cursor: pointer;
-          background: #f44336;
-          color: white;
-          transition: all 0.2s;
-          font-family: Calibri, -apple-system, sans-serif;
+          background: rgba(244, 67, 54, 0.2);
+          color: #f44336;
+          transition: all 0.15s;
+          font-family: 'IBM Plex Sans', -apple-system, sans-serif;
         }
         .clear-map-btn:hover {
-          background: #d32f2f;
+          background: #f44336;
+          color: white;
         }
       `}</style>
     </div>

@@ -1,13 +1,6 @@
 import { useState } from 'react'
 import { useSourceStore, ExtractedConcept } from '../stores/sourceStore'
-
-// DSRP Pattern definitions
-const DSRP_PATTERNS = [
-  { id: 'D', name: 'Distinctions', color: '#1976D2' },
-  { id: 'S', name: 'Systems', color: '#388E3C' },
-  { id: 'R', name: 'Relationships', color: '#F57C00' },
-  { id: 'P', name: 'Perspectives', color: '#7B1FA2' },
-]
+import { DSRP_PATTERNS, DSRPIcon } from './DSRPIcons'
 
 interface SidebarProps {
   onConceptSelect?: (concept: string, move: string) => void
@@ -80,7 +73,7 @@ export function Sidebar({ onConceptSelect, onPatternFilter, renderMode = 'canvas
               onClick={() => togglePattern(pattern.id)}
               title={pattern.name}
             >
-              <span className="chip-letter" style={{ color: pattern.color }}>{pattern.id}</span>
+              <DSRPIcon pattern={pattern.id} size={16} color={pattern.color} />
               <span className="chip-name">{pattern.name}</span>
             </button>
           ))}
@@ -243,7 +236,7 @@ export function Sidebar({ onConceptSelect, onPatternFilter, renderMode = 'canvas
           display: flex;
           align-items: center;
           gap: 6px;
-          padding: 8px 10px;
+          padding: 6px 8px;
           border: 1px solid transparent;
           border-radius: 6px;
           cursor: pointer;
@@ -255,12 +248,8 @@ export function Sidebar({ onConceptSelect, onPatternFilter, renderMode = 'canvas
         .pattern-chip.active {
           border-color: var(--pattern-color);
         }
-        .chip-letter {
-          font-weight: 700;
-          font-size: 14px;
-        }
         .chip-name {
-          font-size: 11px;
+          font-size: 10px;
           color: rgba(255,255,255,0.7);
         }
 

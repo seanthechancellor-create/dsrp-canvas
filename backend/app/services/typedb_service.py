@@ -695,6 +695,190 @@ class TypeDBService:
             logger.debug(f"TypeDB connection check failed: {e}")
             return False
 
+    async def get_graph_stats(self) -> dict:
+        """Get statistics about the knowledge graph."""
+        stats = {
+            "concepts": 0,
+            "analyses": 0,
+            "distinctions": 0,
+            "systems": 0,
+            "relationships": 0,
+            "perspectives": 0,
+            "sources": 0,
+        }
+
+        queries = {
+            "concepts": "match $c isa dsrp_concept; reduce $count = count;",
+            "analyses": "match $a isa dsrp_analysis; reduce $count = count;",
+            "distinctions": "match $d isa distinction; reduce $count = count;",
+            "systems": "match $s isa system_structure; reduce $count = count;",
+            "relationships": "match $r isa relationship_link; reduce $count = count;",
+            "perspectives": "match $p isa perspective_view; reduce $count = count;",
+            "sources": "match $s isa source; reduce $count = count;",
+        }
+
+        for key, query in queries.items():
+            try:
+                with self.read_transaction() as tx:
+                    answer = tx.query(query).resolve()
+                    # TypeDB 3.x returns aggregates differently
+                    for row in answer.as_concept_rows():
+                        stats[key] = row.get("count") or 0
+                        break
+            except Exception as e:
+                logger.debug(f"Error getting {key} count: {e}")
+
+        return stats
+
+    async def export_concept_graph(self, limit: int = 100) -> dict:
+        """Export the concept graph for visualization."""
+        nodes = []
+        edges = []
+
+        # Get all concepts with their IDs and names
+        concept_query = f"""
+            match
+            $c isa dsrp_concept,
+               has concept_id $id,
+               has name $name;
+            fetch {{
+                "id": $id,
+                "name": $name
+            }};
+            limit {limit};
+        """
+
+        concept_ids = set()
+        try:
+            with self.read_transaction() as tx:
+                answer = tx.query(concept_query).resolve()
+                for doc in answer.as_concept_documents():
+                    nodes.append({
+                        "id": doc["id"],
+                        "label": doc["name"],
+                        "type": "concept",
+                    })
+                    concept_ids.add(doc["id"])
+        except Exception as e:
+            logger.error(f"Error exporting concepts: {e}")
+
+        # Get distinctions
+        dist_query = """
+            match
+            (identity: $i, other: $o) isa distinction, has distinction_id $did;
+            $i has concept_id $iid;
+            $o has concept_id $oid;
+            fetch {
+                "id": $did,
+                "source": $iid,
+                "target": $oid,
+                "type": "distinction"
+            };
+        """
+        try:
+            with self.read_transaction() as tx:
+                answer = tx.query(dist_query).resolve()
+                for doc in answer.as_concept_documents():
+                    edges.append({
+                        "id": doc["id"],
+                        "source": doc["source"],
+                        "target": doc["target"],
+                        "type": "D",
+                        "label": "identity/other",
+                    })
+        except Exception as e:
+            logger.debug(f"Error exporting distinctions: {e}")
+
+        # Get system structures
+        sys_query = """
+            match
+            (whole: $w, part: $p) isa system_structure, has system_id $sid;
+            $w has concept_id $wid;
+            $p has concept_id $pid;
+            fetch {
+                "id": $sid,
+                "source": $wid,
+                "target": $pid,
+                "type": "system"
+            };
+        """
+        try:
+            with self.read_transaction() as tx:
+                answer = tx.query(sys_query).resolve()
+                for doc in answer.as_concept_documents():
+                    edges.append({
+                        "id": doc["id"],
+                        "source": doc["source"],
+                        "target": doc["target"],
+                        "type": "S",
+                        "label": "part/whole",
+                    })
+        except Exception as e:
+            logger.debug(f"Error exporting systems: {e}")
+
+        # Get relationships
+        rel_query = """
+            match
+            (action: $a, reaction: $r) isa relationship_link, has relationship_id $rid;
+            $a has concept_id $aid;
+            $r has concept_id $rid2;
+            fetch {
+                "id": $rid,
+                "source": $aid,
+                "target": $rid2,
+                "type": "relationship"
+            };
+        """
+        try:
+            with self.read_transaction() as tx:
+                answer = tx.query(rel_query).resolve()
+                for doc in answer.as_concept_documents():
+                    edges.append({
+                        "id": doc["id"],
+                        "source": doc["source"],
+                        "target": doc["target"],
+                        "type": "R",
+                        "label": "action/reaction",
+                    })
+        except Exception as e:
+            logger.debug(f"Error exporting relationships: {e}")
+
+        # Get perspectives
+        persp_query = """
+            match
+            (point: $p, view: $v) isa perspective_view, has perspective_id $pid;
+            $p has concept_id $pid2;
+            $v has concept_id $vid;
+            fetch {
+                "id": $pid,
+                "source": $pid2,
+                "target": $vid,
+                "type": "perspective"
+            };
+        """
+        try:
+            with self.read_transaction() as tx:
+                answer = tx.query(persp_query).resolve()
+                for doc in answer.as_concept_documents():
+                    edges.append({
+                        "id": doc["id"],
+                        "source": doc["source"],
+                        "target": doc["target"],
+                        "type": "P",
+                        "label": "point/view",
+                    })
+        except Exception as e:
+            logger.debug(f"Error exporting perspectives: {e}")
+
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "stats": {
+                "node_count": len(nodes),
+                "edge_count": len(edges),
+            },
+        }
+
 
 # Singleton instance
 _typedb_service: Optional[TypeDBService] = None

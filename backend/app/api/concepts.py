@@ -139,3 +139,74 @@ async def delete_concept(concept_id: str):
         raise HTTPException(status_code=404, detail="Concept not found")
     del concepts_db[concept_id]
     return {"deleted": concept_id}
+
+
+@router.get("/graph/stats")
+async def get_graph_stats():
+    """Get statistics about the knowledge graph."""
+    typedb = get_typedb_service()
+    try:
+        stats = await typedb.get_graph_stats()
+        return {
+            "success": True,
+            "stats": stats,
+        }
+    except Exception as e:
+        logger.warning(f"Failed to get graph stats: {e}")
+        # Return in-memory stats as fallback
+        return {
+            "success": False,
+            "stats": {
+                "concepts": len(concepts_db),
+                "analyses": 0,
+                "distinctions": 0,
+                "systems": 0,
+                "relationships": 0,
+                "perspectives": 0,
+                "sources": 0,
+            },
+            "error": str(e),
+        }
+
+
+@router.get("/graph/export")
+async def export_concept_graph(limit: int = 100):
+    """Export the concept graph for visualization."""
+    typedb = get_typedb_service()
+    try:
+        graph = await typedb.export_concept_graph(limit=limit)
+        return {
+            "success": True,
+            "graph": graph,
+        }
+    except Exception as e:
+        logger.warning(f"Failed to export graph: {e}")
+        # Return in-memory concepts as fallback
+        nodes = [
+            {"id": c["id"], "label": c["name"], "type": "concept"}
+            for c in concepts_db.values()
+        ]
+        return {
+            "success": False,
+            "graph": {
+                "nodes": nodes,
+                "edges": [],
+                "stats": {"node_count": len(nodes), "edge_count": 0},
+            },
+            "error": str(e),
+        }
+
+
+@router.get("/{concept_id}/relations")
+async def get_concept_relations(concept_id: str):
+    """Get all DSRP relations for a concept."""
+    typedb = get_typedb_service()
+    try:
+        relations = await typedb.get_concept_relations(concept_id)
+        return {
+            "concept_id": concept_id,
+            "relations": relations,
+        }
+    except Exception as e:
+        logger.warning(f"Failed to get relations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

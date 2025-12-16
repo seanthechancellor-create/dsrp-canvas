@@ -6,21 +6,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react'
-
-// DSRP Pattern colors
-const PATTERN_COLORS: Record<string, string> = {
-  D: '#1976D2',
-  S: '#388E3C',
-  R: '#F57C00',
-  P: '#7B1FA2',
-}
-
-const PATTERN_NAMES: Record<string, string> = {
-  D: 'Distinctions',
-  S: 'Systems',
-  R: 'Relationships',
-  P: 'Perspectives',
-}
+import { DSRP_COLORS, DSRP_NAMES, DSRPIcon, DSRPPattern } from './DSRPIcons'
 
 interface AnalysisResult {
   pattern: string
@@ -139,8 +125,9 @@ export function DetailsDrawer({ isOpen, onClose, concept, result, onDrillDown }:
     }
   }
 
-  const patternColor = PATTERN_COLORS[result?.pattern || 'D']
-  const patternName = PATTERN_NAMES[result?.pattern || 'D']
+  const patternKey = (result?.pattern || 'D') as DSRPPattern
+  const patternColor = DSRP_COLORS[patternKey]
+  const patternName = DSRP_NAMES[patternKey]
 
   if (!isOpen) return null
 
@@ -155,7 +142,7 @@ export function DetailsDrawer({ isOpen, onClose, concept, result, onDrillDown }:
       <div className="drawer-header">
         <div className="header-left">
           <span className="pattern-badge" style={{ background: patternColor }}>
-            {result?.pattern || 'D'}
+            <DSRPIcon pattern={patternKey} size={18} color="#fff" />
           </span>
           <h3 className="concept-title">{concept || 'Select a concept'}</h3>
           <span className="pattern-name">{patternName}</span>
@@ -335,11 +322,11 @@ export function DetailsDrawer({ isOpen, onClose, concept, result, onDrillDown }:
           gap: 12px;
         }
         .pattern-badge {
-          padding: 4px 10px;
-          border-radius: 4px;
-          font-weight: 600;
-          font-size: 14px;
-          color: white;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 6px;
+          border-radius: 6px;
         }
         .concept-title {
           margin: 0;

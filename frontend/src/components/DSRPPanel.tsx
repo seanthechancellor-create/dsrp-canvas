@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useDSRPAnalysis } from '../hooks/useDSRPAnalysis'
 import { useExport } from '../hooks/useExport'
 import { useConceptStore } from '../stores/conceptStore'
+import { DSRP_PATTERNS, DSRPIcon } from './DSRPIcons'
 
 
 interface AnalysisResult {
@@ -17,13 +18,6 @@ interface DSRPPanelProps {
   drillDownConcept?: string | null
   initialMove?: string
 }
-
-const DSRP_PATTERNS = [
-  { id: 'D', name: 'Distinctions', elements: ['identity', 'other'], color: '#1976D2' },
-  { id: 'S', name: 'Systems', elements: ['part', 'whole'], color: '#388E3C' },
-  { id: 'R', name: 'Relationships', elements: ['action', 'reaction'], color: '#F57C00' },
-  { id: 'P', name: 'Perspectives', elements: ['point', 'view'], color: '#7B1FA2' },
-]
 
 const SIX_MOVES = [
   { id: 'is-is-not', name: 'Is/Is Not', pattern: 'D', description: 'Define what it IS and IS NOT' },
@@ -137,9 +131,11 @@ export function DSRPPanel({ onAnalysisComplete, onClear, drillDownConcept, initi
         <div className="patterns-grid">
           {DSRP_PATTERNS.map((p) => (
             <div key={p.id} className="pattern-card" style={{ borderColor: p.color }}>
-              <span className="pattern-id" style={{ color: p.color }}>{p.id}</span>
-              <span className="pattern-name">{p.name}</span>
-              <span className="pattern-elements">{p.elements.join(' / ')}</span>
+              <DSRPIcon pattern={p.id} size={20} />
+              <div className="pattern-info">
+                <span className="pattern-name">{p.name}</span>
+                <span className="pattern-elements">{p.elements.join(' / ')}</span>
+              </div>
             </div>
           ))}
         </div>
@@ -276,30 +272,31 @@ export function DSRPPanel({ onAnalysisComplete, onClear, drillDownConcept, initi
         .patterns-grid {
           display: grid;
           grid-template-columns: repeat(2, 1fr);
-          gap: 8px;
+          gap: 6px;
         }
         .pattern-card {
+          display: flex;
+          align-items: center;
+          gap: 8px;
           background: rgba(255,255,255,0.05);
           border: 2px solid;
           border-radius: 6px;
-          padding: 8px;
-          text-align: center;
+          padding: 6px 8px;
         }
-        .pattern-id {
-          display: block;
-          font-size: 18px;
-          font-weight: bold;
+        .pattern-info {
+          flex: 1;
+          min-width: 0;
         }
         .pattern-name {
           display: block;
           font-size: 11px;
           color: #ccc;
+          font-weight: 500;
         }
         .pattern-elements {
           display: block;
           font-size: 9px;
           color: #888;
-          margin-top: 2px;
         }
         .dynamics-row {
           display: flex;

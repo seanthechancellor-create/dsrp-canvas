@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import sources, analysis, export, concepts, search, cache
+from app.api import sources, analysis, export, concepts, search, cache, patterns
 
 app = FastAPI(
     title="DSRP Canvas API",
@@ -22,6 +22,7 @@ app.include_router(sources.router, prefix="/api/sources", tags=["sources"])
 app.include_router(analysis.router, prefix="/api/analysis", tags=["analysis"])
 app.include_router(export.router, prefix="/api/export", tags=["export"])
 app.include_router(concepts.router, prefix="/api/concepts", tags=["concepts"])
+app.include_router(patterns.router, prefix="/api/dsrp", tags=["dsrp"])
 
 # New services
 app.include_router(search.router, prefix="/api", tags=["search"])

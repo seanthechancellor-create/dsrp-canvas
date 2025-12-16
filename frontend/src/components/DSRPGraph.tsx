@@ -584,8 +584,8 @@ export function DSRPGraph({ concept, result, onNodeClick, conceptMap, showConcep
           width: 100%;
           height: 100%;
           position: relative;
-          background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-          border-radius: 8px;
+          background: linear-gradient(180deg, #0a0a0f 0%, #0d1117 100%);
+          border-radius: 0;
           overflow: hidden;
           display: flex;
           flex-direction: column;
@@ -600,14 +600,14 @@ export function DSRPGraph({ concept, result, onNodeClick, conceptMap, showConcep
           left: 50%;
           transform: translate(-50%, -50%);
           text-align: center;
-          color: #666;
-          font-family: Calibri, -apple-system, sans-serif;
+          color: rgba(255,255,255,0.4);
+          font-family: 'IBM Plex Sans', -apple-system, sans-serif;
           font-size: 14px;
         }
         .details-panel {
-          background: white;
-          border-top: 1px solid #ccc;
-          box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+          background: #16213e;
+          border-top: 1px solid rgba(255,255,255,0.1);
+          box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
           display: flex;
           flex-direction: column;
           z-index: 100;
@@ -616,20 +616,20 @@ export function DSRPGraph({ concept, result, onNodeClick, conceptMap, showConcep
         .resize-handle {
           height: 12px;
           width: 100%;
-          background: #f0f0f0;
+          background: rgba(255,255,255,0.03);
           cursor: row-resize;
           display: flex;
           align-items: center;
           justify-content: center;
-          border-bottom: 1px solid #e0e0e0;
+          border-bottom: 1px solid rgba(255,255,255,0.1);
         }
         .resize-handle:hover {
-          background: #e0e0e0;
+          background: rgba(255,255,255,0.06);
         }
         .taco-grip {
           width: 40px;
           height: 4px;
-          background: #ccc;
+          background: rgba(255,255,255,0.2);
           border-radius: 2px;
         }
         .panel-header {
@@ -637,13 +637,13 @@ export function DSRPGraph({ concept, result, onNodeClick, conceptMap, showConcep
           justify-content: space-between;
           align-items: center;
           padding: 8px 15px;
-          background: #f8f9fa;
-          border-bottom: 1px solid #eee;
+          background: rgba(255,255,255,0.03);
+          border-bottom: 1px solid rgba(255,255,255,0.1);
         }
         .panel-header h4 {
           margin: 0;
           font-size: 16px;
-          color: #333;
+          color: #fff;
         }
         .panel-controls {
           display: flex;
@@ -660,7 +660,7 @@ export function DSRPGraph({ concept, result, onNodeClick, conceptMap, showConcep
           margin: 0;
           font-size: 14px;
           line-height: 1.6;
-          color: #444;
+          color: rgba(255,255,255,0.8);
           white-space: pre-wrap;
         }
         .close-btn {
@@ -668,14 +668,14 @@ export function DSRPGraph({ concept, result, onNodeClick, conceptMap, showConcep
           border: none;
           font-size: 24px;
           cursor: pointer;
-          color: #999;
+          color: rgba(255,255,255,0.5);
           line-height: 1;
           padding: 0 5px;
         }
-        .close-btn:hover { color: #333; }
+        .close-btn:hover { color: #fff; }
         .drill-btn {
           padding: 6px 12px;
-          background: #1976D2;
+          background: #e94560;
           color: white;
           border: none;
           border-radius: 4px;
@@ -683,7 +683,7 @@ export function DSRPGraph({ concept, result, onNodeClick, conceptMap, showConcep
           font-size: 13px;
           font-weight: 500;
         }
-        .drill-btn:hover { background: #1565C0; }
+        .drill-btn:hover { background: #d63850; }
         .dsrp-legend {
           position: absolute;
           left: 10px;

@@ -6,6 +6,13 @@ from pydantic import BaseModel
 
 from agents.dsrp_agent import DSRPAgent
 from app.services.typedb_service import get_typedb_service
+from app.models.dsrp import (
+    DSRP_PATTERNS,
+    DSRP_MOVES,
+    get_pattern_for_move,
+    get_pattern_color,
+    get_pattern_elements,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -19,6 +26,21 @@ class AnalysisRequest(BaseModel):
     context: str | None = None
 
 
+class PatternMetadata(BaseModel):
+    """Rich pattern metadata included in analysis response."""
+    id: str
+    name: str
+    color: str
+    elements: list[str]
+
+
+class MoveMetadata(BaseModel):
+    """Rich move metadata included in analysis response."""
+    id: str
+    name: str
+    description: str
+
+
 class AnalysisResponse(BaseModel):
     pattern: str
     elements: dict
@@ -28,6 +50,9 @@ class AnalysisResponse(BaseModel):
     confidence: float = 0.85
     provider: str | None = None
     concept: str | None = None
+    # Rich metadata
+    pattern_metadata: PatternMetadata | None = None
+    move_metadata: MoveMetadata | None = None
 
 
 @router.post("/dsrp", response_model=AnalysisResponse)
@@ -88,6 +113,23 @@ async def analyze_with_dsrp(request: AnalysisRequest):
 
     except Exception as e:
         logger.warning(f"Failed to persist analysis to TypeDB: {e}")
+
+    # Add rich metadata
+    pattern_id = result.get("pattern", "D")
+    pattern_info = DSRP_PATTERNS.get(pattern_id, DSRP_PATTERNS["D"])
+    move_info = DSRP_MOVES.get(request.move, DSRP_MOVES["is-is-not"])
+
+    result["pattern_metadata"] = PatternMetadata(
+        id=pattern_info["id"],
+        name=pattern_info["name"],
+        color=pattern_info["color"],
+        elements=pattern_info["elements"],
+    )
+    result["move_metadata"] = MoveMetadata(
+        id=move_info["id"],
+        name=move_info["name"],
+        description=move_info["description"],
+    )
 
     return AnalysisResponse(**result)
 
@@ -320,6 +362,23 @@ async def mock_analyze(request: AnalysisRequest):
     response = mock_responses.get(move, mock_responses["is-is-not"])
     response["concept"] = concept
     response["provider"] = "mock"
+
+    # Add rich metadata
+    pattern_id = response.get("pattern", "D")
+    pattern_info = DSRP_PATTERNS.get(pattern_id, DSRP_PATTERNS["D"])
+    move_info = DSRP_MOVES.get(move, DSRP_MOVES["is-is-not"])
+
+    response["pattern_metadata"] = PatternMetadata(
+        id=pattern_info["id"],
+        name=pattern_info["name"],
+        color=pattern_info["color"],
+        elements=pattern_info["elements"],
+    )
+    response["move_metadata"] = MoveMetadata(
+        id=move_info["id"],
+        name=move_info["name"],
+        description=move_info["description"],
+    )
 
     return AnalysisResponse(**response)
 
