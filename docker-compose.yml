@@ -4,6 +4,7 @@ services:
     image: typedb/typedb:latest
     ports:
       - "1729:1729"
+      - "1730:8000"
     volumes:
       - typedb_data:/var/lib/typedb/data
     healthcheck:
