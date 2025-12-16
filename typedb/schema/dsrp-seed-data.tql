@@ -1,0 +1,58 @@
+# ============================================================================
+# DSRP 4-8-3 Seed Data
+# Initial data for the 6 Moves
+# ============================================================================
+
+insert
+
+# ----------------------------------------------------------------------------
+# THE 6 MOVES
+# ----------------------------------------------------------------------------
+
+# Move 1: Is/Is Not (Distinction)
+$m1 isa dsrp_move,
+    has move_id "is-is-not",
+    has move_name "Is/Is Not",
+    has move_pattern "D",
+    has move_question "What IS this thing? What is it NOT?",
+    has description "Define the boundaries of a concept by identifying what it is and explicitly what it is not. This creates a clear distinction.";
+
+# Move 2: Zoom In (System - Parts)
+$m2 isa dsrp_move,
+    has move_id "zoom-in",
+    has move_name "Zoom In",
+    has move_pattern "S",
+    has move_question "What are the PARTS of this thing?",
+    has description "Break down a concept into its constituent parts. Every whole can be decomposed into smaller parts.";
+
+# Move 3: Zoom Out (System - Whole)
+$m3 isa dsrp_move,
+    has move_id "zoom-out",
+    has move_name "Zoom Out",
+    has move_pattern "S",
+    has move_question "What is this thing PART OF?",
+    has description "Identify the larger wholes that contain this concept. Every part exists within larger systems.";
+
+# Move 4: Part-Party (System - Parts + Relationships)
+$m4 isa dsrp_move,
+    has move_id "part-party",
+    has move_name "Part-Party",
+    has move_pattern "S",
+    has move_question "What are the parts AND how do they RELATE to each other?",
+    has description "Identify parts and map the relationships between them. Combines Systems and Relationships thinking.";
+
+# Move 5: RDS Barbell (Relationship)
+$m5 isa dsrp_move,
+    has move_id "rds-barbell",
+    has move_name "RDS Barbell",
+    has move_pattern "R",
+    has move_question "What RELATES to this? Then DISTINGUISH and SYSTEMATIZE each related thing.",
+    has description "Start with relationships, then apply distinctions and systems to each related element. The barbell shape represents two things connected by a relationship.";
+
+# Move 6: P-Circle (Perspective)
+$m6 isa dsrp_move,
+    has move_id "p-circle",
+    has move_name "P-Circle",
+    has move_pattern "P",
+    has move_question "From what PERSPECTIVES can this be viewed? What does each perspective SEE?",
+    has description "Map multiple perspectives around a concept. Each perspective has a point (the viewer) and a view (what they see).";

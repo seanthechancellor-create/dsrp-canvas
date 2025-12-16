@@ -1,0 +1,165 @@
+define
+
+# ============================================================================
+# DSRP Knowledge Graph Schema (TypeDB 3.x compatible)
+# Based on DSRP Theory (Distinctions, Systems, Relationships, Perspectives)
+# 4 Patterns, 8 Elements, 3 Dynamics
+# ============================================================================
+
+# --- Attributes ---
+attribute concept_id, value string;
+attribute source_id, value string;
+attribute analysis_id, value string;
+attribute note_id, value string;
+attribute distinction_id, value string;
+attribute system_id, value string;
+attribute relationship_id, value string;
+attribute perspective_id, value string;
+attribute extraction_id, value string;
+attribute analysis_link_id, value string;
+attribute note_link_id, value string;
+
+attribute name, value string;
+attribute description, value string;
+attribute extracted_text, value string;
+attribute note_content, value string;
+attribute reasoning, value string;
+
+attribute source_type, value string;
+attribute pattern_type, value string;
+attribute element_type, value string;
+attribute move_type, value string;
+attribute relationship_type, value string;
+attribute extraction_method, value string;
+
+attribute file_path, value string;
+attribute original_filename, value string;
+
+attribute canvas_x, value double;
+attribute canvas_y, value double;
+attribute canvas_scale, value double;
+attribute note_color, value string;
+
+attribute distinction_label, value string;
+attribute system_label, value string;
+attribute relationship_label, value string;
+attribute perspective_label, value string;
+
+attribute confidence_score, value double;
+attribute page_number, value long;
+attribute timestamp_start, value double;
+attribute timestamp_end, value double;
+attribute created_at, value datetime;
+attribute updated_at, value datetime;
+
+# --- Core Concept Entity ---
+entity dsrp_concept,
+    owns concept_id @key,
+    owns name,
+    owns description,
+    owns created_at,
+    owns updated_at,
+    plays distinction:identity,
+    plays distinction:other,
+    plays system_structure:whole,
+    plays system_structure:part,
+    plays relationship_link:action,
+    plays relationship_link:reaction,
+    plays perspective_view:point,
+    plays perspective_view:view,
+    plays extraction:extracted,
+    plays analysis_rel:subject,
+    plays note_link:linked_concept;
+
+# --- Source Material Entity ---
+entity source,
+    owns source_id @key,
+    owns source_type,
+    owns file_path,
+    owns original_filename,
+    owns extracted_text,
+    owns created_at,
+    plays extraction:source_material,
+    plays analysis_rel:source_reference;
+
+# --- DSRP Analysis Entity ---
+entity dsrp_analysis,
+    owns analysis_id @key,
+    owns pattern_type,
+    owns element_type,
+    owns move_type,
+    owns reasoning,
+    owns confidence_score,
+    owns created_at,
+    plays analysis_rel:result;
+
+# --- Canvas Note Entity (for UI) ---
+entity canvas_note,
+    owns note_id @key,
+    owns canvas_x,
+    owns canvas_y,
+    owns canvas_scale,
+    owns note_content,
+    owns note_color,
+    owns created_at,
+    plays note_link:note;
+
+# ============================================================================
+# DSRP Pattern Relations (The 4 Patterns)
+# ============================================================================
+
+# D - Distinction: identity/other
+relation distinction,
+    owns distinction_id @key,
+    owns distinction_label,
+    relates identity,
+    relates other;
+
+# S - System: part/whole
+relation system_structure,
+    owns system_id @key,
+    owns system_label,
+    relates whole,
+    relates part;
+
+# R - Relationship: action/reaction
+relation relationship_link,
+    owns relationship_id @key,
+    owns relationship_label,
+    owns relationship_type,
+    relates action,
+    relates reaction;
+
+# P - Perspective: point/view
+relation perspective_view,
+    owns perspective_id @key,
+    owns perspective_label,
+    relates point,
+    relates view;
+
+# ============================================================================
+# Supporting Relations
+# ============================================================================
+
+# Links sources to extracted concepts
+relation extraction,
+    owns extraction_id @key,
+    owns extraction_method,
+    owns page_number,
+    owns timestamp_start,
+    owns timestamp_end,
+    relates source_material,
+    relates extracted;
+
+# Links concepts to their DSRP analyses
+relation analysis_rel,
+    owns analysis_link_id @key,
+    relates subject,
+    relates source_reference,
+    relates result;
+
+# Links canvas notes to concepts
+relation note_link,
+    owns note_link_id @key,
+    relates note,
+    relates linked_concept;
