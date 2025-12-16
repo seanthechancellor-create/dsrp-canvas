@@ -33,9 +33,11 @@ async def health_check():
     """Health check endpoint with service status."""
     from app.services.cache_service import get_cache_service
     from app.services.vector_service import _get_pool
+    from app.services.typedb_service import get_typedb_service
 
     cache = get_cache_service()
     pg_pool = _get_pool()
+    typedb = get_typedb_service()
 
     return {
         "status": "healthy",
@@ -43,5 +45,6 @@ async def health_check():
         "services": {
             "redis": "connected" if cache.available else "unavailable",
             "pgvector": "connected" if pg_pool else "unavailable",
+            "typedb": "connected" if typedb.is_connected() else "unavailable",
         },
     }

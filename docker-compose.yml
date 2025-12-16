@@ -1,11 +1,11 @@
 services:
   # Knowledge Graph Database
   typedb:
-    image: vaticle/typedb:2.28.0
+    image: typedb/typedb:latest
     ports:
       - "1729:1729"
     volumes:
-      - typedb_data:/opt/typedb-all-linux-x86_64/server/data
+      - typedb_data:/var/lib/typedb/data
     healthcheck:
       test: ["CMD-SHELL", "echo 'healthy'"]
       interval: 10s
@@ -51,6 +51,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
       - AI_PROVIDER=${AI_PROVIDER:-gemini}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
@@ -100,7 +102,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - VITE_API_URL=http://localhost:8000
+      - API_PROXY_TARGET=http://backend:8000
+      - VITE_API_URL=
     volumes:
       - ./frontend:/app
       - /app/node_modules

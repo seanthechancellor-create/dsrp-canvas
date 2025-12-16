@@ -104,15 +104,15 @@ class TypeDBService:
         """Create a new source entity in TypeDB."""
         now = datetime.utcnow().isoformat()
 
-        # TypeDB 3.x insert query
+        # TypeDB 3.x insert query (using underscored attribute names to match schema)
         query = f"""
             insert
             $s isa source,
-                has source-id "{source_id}",
-                has source-type "{source_type}",
-                has file-path "{file_path}",
-                has original-filename "{original_filename}",
-                has created-at {now};
+                has source_id "{source_id}",
+                has source_type "{source_type}",
+                has file_path "{file_path}",
+                has original_filename "{original_filename}",
+                has created_at {now};
         """
 
         with self.write_transaction() as tx:
@@ -133,9 +133,9 @@ class TypeDBService:
 
         query = f"""
             match
-            $s isa source, has source-id "{source_id}";
+            $s isa source, has source_id "{source_id}";
             insert
-            $s has extracted-text "{escaped_text}";
+            $s has extracted_text "{escaped_text}";
         """
 
         try:
@@ -151,13 +151,13 @@ class TypeDBService:
         # TypeDB 3.x fetch query for JSON output
         query = f"""
             match
-            $s isa source, has source-id "{source_id}";
-            $s has source-type $type,
-               has file-path $path,
-               has original-filename $filename,
-               has created-at $created;
+            $s isa source, has source_id "{source_id}";
+            $s has source_type $type,
+               has file_path $path,
+               has original_filename $filename,
+               has created_at $created;
             fetch {{
-                "id": $s.source-id,
+                "id": $s.source_id,
                 "source_type": $type,
                 "file_path": $path,
                 "original_filename": $filename,
@@ -179,8 +179,8 @@ class TypeDBService:
         """Get extracted text for a source."""
         query = f"""
             match
-            $s isa source, has source-id "{source_id}",
-               has extracted-text $text;
+            $s isa source, has source_id "{source_id}",
+               has extracted_text $text;
             fetch {{ "text": $text }};
         """
 
@@ -199,10 +199,10 @@ class TypeDBService:
         query = f"""
             match
             $s isa source,
-               has source-id $id,
-               has source-type $type,
-               has original-filename $filename,
-               has created-at $created;
+               has source_id $id,
+               has source_type $type,
+               has original_filename $filename,
+               has created_at $created;
             fetch {{
                 "id": $id,
                 "source_type": $type,
@@ -240,11 +240,11 @@ class TypeDBService:
 
         query = f"""
             insert
-            $c isa concept,
-                has concept-id "{concept_id}",
+            $c isa dsrp_concept,
+                has concept_id "{concept_id}",
                 has name "{name}"{desc_clause},
-                has created-at {now},
-                has updated-at {now};
+                has created_at {now},
+                has updated_at {now};
         """
 
         with self.write_transaction() as tx:
@@ -262,10 +262,10 @@ class TypeDBService:
         """Get a concept by ID."""
         query = f"""
             match
-            $c isa concept, has concept-id "{concept_id}";
-            $c has name $name, has created-at $created, has updated-at $updated;
+            $c isa dsrp_concept, has concept_id "{concept_id}";
+            $c has name $name, has created_at $created, has updated_at $updated;
             fetch {{
-                "id": $c.concept-id,
+                "id": $c.concept_id,
                 "name": $name,
                 "created_at": $created,
                 "updated_at": $updated
@@ -288,7 +288,7 @@ class TypeDBService:
         """Get concept description (optional attribute)."""
         query = f"""
             match
-            $c isa concept, has concept-id "{concept_id}", has description $desc;
+            $c isa dsrp_concept, has concept_id "{concept_id}", has description $desc;
             fetch {{ "description": $desc }};
         """
 
@@ -305,8 +305,8 @@ class TypeDBService:
         """Get a concept by name."""
         query = f"""
             match
-            $c isa concept, has name "{name}";
-            $c has concept-id $id, has created-at $created, has updated-at $updated;
+            $c isa dsrp_concept, has name "{name}";
+            $c has concept_id $id, has created_at $created, has updated_at $updated;
             fetch {{
                 "id": $id,
                 "name": $c.name,
@@ -329,11 +329,11 @@ class TypeDBService:
         """List all concepts with pagination."""
         query = f"""
             match
-            $c isa concept,
-               has concept-id $id,
+            $c isa dsrp_concept,
+               has concept_id $id,
                has name $name,
-               has created-at $created,
-               has updated-at $updated;
+               has created_at $created,
+               has updated_at $updated;
             fetch {{
                 "id": $id,
                 "name": $name,
@@ -359,9 +359,9 @@ class TypeDBService:
         """Delete a concept by ID."""
         query = f"""
             match
-            $c isa concept, has concept-id "{concept_id}";
+            $c isa dsrp_concept, has concept_id "{concept_id}";
             delete
-            $c isa concept;
+            $c isa dsrp_concept;
         """
 
         try:
@@ -393,13 +393,13 @@ class TypeDBService:
         # Insert the analysis entity
         insert_query = f"""
             insert
-            $a isa dsrp-analysis,
-                has analysis-id "{analysis_id}",
-                has pattern-type "{pattern_type}",
-                has move-type "{move_type}",
+            $a isa dsrp_analysis,
+                has analysis_id "{analysis_id}",
+                has pattern_type "{pattern_type}",
+                has move_type "{move_type}",
                 has reasoning "{escaped_reasoning}",
-                has confidence-score {confidence_score},
-                has created-at {now};
+                has confidence_score {confidence_score},
+                has created_at {now};
         """
 
         with self.write_transaction() as tx:
@@ -408,11 +408,11 @@ class TypeDBService:
         # Link analysis to concept
         link_query = f"""
             match
-            $c isa concept, has concept-id "{concept_id}";
-            $a isa dsrp-analysis, has analysis-id "{analysis_id}";
+            $c isa dsrp_concept, has concept_id "{concept_id}";
+            $a isa dsrp_analysis, has analysis_id "{analysis_id}";
             insert
-            (subject: $c, result: $a) isa analysis,
-                has analysis-link-id "{analysis_id}_link";
+            (subject: $c, result: $a) isa analysis_rel,
+                has analysis_link_id "{analysis_id}_link";
         """
 
         try:
@@ -435,14 +435,14 @@ class TypeDBService:
         """Get all analyses for a concept."""
         query = f"""
             match
-            $c isa concept, has concept-id "{concept_id}";
-            (subject: $c, result: $a) isa analysis;
-            $a has analysis-id $aid,
-               has pattern-type $pattern,
-               has move-type $move,
+            $c isa dsrp_concept, has concept_id "{concept_id}";
+            (subject: $c, result: $a) isa analysis_rel;
+            $a has analysis_id $aid,
+               has pattern_type $pattern,
+               has move_type $move,
                has reasoning $reason,
-               has confidence-score $conf,
-               has created-at $created;
+               has confidence_score $conf,
+               has created_at $created;
             fetch {{
                 "id": $aid,
                 "pattern": $pattern,
@@ -476,15 +476,15 @@ class TypeDBService:
         label: Optional[str] = None,
     ) -> dict:
         """Create a distinction relation between two concepts."""
-        label_clause = f', has distinction-label "{label}"' if label else ""
+        label_clause = f', has distinction_label "{label}"' if label else ""
 
         query = f"""
             match
-            $i isa concept, has concept-id "{identity_concept_id}";
-            $o isa concept, has concept-id "{other_concept_id}";
+            $i isa dsrp_concept, has concept_id "{identity_concept_id}";
+            $o isa dsrp_concept, has concept_id "{other_concept_id}";
             insert
             (identity: $i, other: $o) isa distinction,
-                has distinction-id "{distinction_id}"{label_clause};
+                has distinction_id "{distinction_id}"{label_clause};
         """
 
         with self.write_transaction() as tx:
@@ -504,16 +504,16 @@ class TypeDBService:
         part_concept_id: str,
         label: Optional[str] = None,
     ) -> dict:
-        """Create a system-structure relation (part/whole)."""
-        label_clause = f', has system-label "{label}"' if label else ""
+        """Create a system_structure relation (part/whole)."""
+        label_clause = f', has system_label "{label}"' if label else ""
 
         query = f"""
             match
-            $w isa concept, has concept-id "{whole_concept_id}";
-            $p isa concept, has concept-id "{part_concept_id}";
+            $w isa dsrp_concept, has concept_id "{whole_concept_id}";
+            $p isa dsrp_concept, has concept_id "{part_concept_id}";
             insert
-            (whole: $w, part: $p) isa system-structure,
-                has system-id "{system_id}"{label_clause};
+            (whole: $w, part: $p) isa system_structure,
+                has system_id "{system_id}"{label_clause};
         """
 
         with self.write_transaction() as tx:
@@ -534,17 +534,17 @@ class TypeDBService:
         relationship_type: Optional[str] = None,
         label: Optional[str] = None,
     ) -> dict:
-        """Create a relationship-link relation (action/reaction)."""
-        type_clause = f', has relationship-type "{relationship_type}"' if relationship_type else ""
-        label_clause = f', has relationship-label "{label}"' if label else ""
+        """Create a relationship_link relation (action/reaction)."""
+        type_clause = f', has relationship_type "{relationship_type}"' if relationship_type else ""
+        label_clause = f', has relationship_label "{label}"' if label else ""
 
         query = f"""
             match
-            $a isa concept, has concept-id "{action_concept_id}";
-            $r isa concept, has concept-id "{reaction_concept_id}";
+            $a isa dsrp_concept, has concept_id "{action_concept_id}";
+            $r isa dsrp_concept, has concept_id "{reaction_concept_id}";
             insert
-            (action: $a, reaction: $r) isa relationship-link,
-                has relationship-id "{relationship_id}"{type_clause}{label_clause};
+            (action: $a, reaction: $r) isa relationship_link,
+                has relationship_id "{relationship_id}"{type_clause}{label_clause};
         """
 
         with self.write_transaction() as tx:
@@ -565,16 +565,16 @@ class TypeDBService:
         view_concept_id: str,
         label: Optional[str] = None,
     ) -> dict:
-        """Create a perspective-view relation (point/view)."""
-        label_clause = f', has perspective-label "{label}"' if label else ""
+        """Create a perspective_view relation (point/view)."""
+        label_clause = f', has perspective_label "{label}"' if label else ""
 
         query = f"""
             match
-            $p isa concept, has concept-id "{point_concept_id}";
-            $v isa concept, has concept-id "{view_concept_id}";
+            $p isa dsrp_concept, has concept_id "{point_concept_id}";
+            $v isa dsrp_concept, has concept_id "{view_concept_id}";
             insert
-            (point: $p, view: $v) isa perspective-view,
-                has perspective-id "{perspective_id}"{label_clause};
+            (point: $p, view: $v) isa perspective_view,
+                has perspective_id "{perspective_id}"{label_clause};
         """
 
         with self.write_transaction() as tx:
@@ -599,8 +599,8 @@ class TypeDBService:
         # Get distinctions where concept is identity
         dist_query = f"""
             match
-            $c isa concept, has concept-id "{concept_id}";
-            (identity: $c, other: $o) isa distinction, has distinction-id $did;
+            $c isa dsrp_concept, has concept_id "{concept_id}";
+            (identity: $c, other: $o) isa distinction, has distinction_id $did;
             $o has name $oname;
             fetch {{
                 "id": $did,
@@ -620,8 +620,8 @@ class TypeDBService:
         # Get system structures where concept is whole
         sys_query = f"""
             match
-            $c isa concept, has concept-id "{concept_id}";
-            (whole: $c, part: $p) isa system-structure, has system-id $sid;
+            $c isa dsrp_concept, has concept_id "{concept_id}";
+            (whole: $c, part: $p) isa system_structure, has system_id $sid;
             $p has name $pname;
             fetch {{
                 "id": $sid,
@@ -641,8 +641,8 @@ class TypeDBService:
         # Get relationships where concept is action
         rel_query = f"""
             match
-            $c isa concept, has concept-id "{concept_id}";
-            (action: $c, reaction: $r) isa relationship-link, has relationship-id $rid;
+            $c isa dsrp_concept, has concept_id "{concept_id}";
+            (action: $c, reaction: $r) isa relationship_link, has relationship_id $rid;
             $r has name $rname;
             fetch {{
                 "id": $rid,
@@ -662,8 +662,8 @@ class TypeDBService:
         # Get perspectives where concept is point
         persp_query = f"""
             match
-            $c isa concept, has concept-id "{concept_id}";
-            (point: $c, view: $v) isa perspective-view, has perspective-id $pid;
+            $c isa dsrp_concept, has concept_id "{concept_id}";
+            (point: $c, view: $v) isa perspective_view, has perspective_id $pid;
             $v has name $vname;
             fetch {{
                 "id": $pid,
@@ -681,6 +681,19 @@ class TypeDBService:
             logger.debug(f"Error getting perspectives: {e}")
 
         return relations
+
+
+    def is_connected(self) -> bool:
+        """Check if TypeDB connection is available."""
+        try:
+            if self.driver is None:
+                return False
+            # Try to list databases to verify connection
+            databases = self.driver.databases.all()
+            return True
+        except Exception as e:
+            logger.debug(f"TypeDB connection check failed: {e}")
+            return False
 
 
 # Singleton instance

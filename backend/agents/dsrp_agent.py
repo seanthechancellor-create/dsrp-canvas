@@ -217,7 +217,7 @@ class GeminiProvider(BaseAIProvider):
                 raise ValueError("GOOGLE_API_KEY or GEMINI_API_KEY not set")
             genai.configure(api_key=api_key)
             self.model = genai.GenerativeModel(
-                model_name="gemini-2.5-flash",
+                model_name="models/gemini-2.0-flash",
                 system_instruction=DSRP_SYSTEM_PROMPT,
             )
             self._available = True

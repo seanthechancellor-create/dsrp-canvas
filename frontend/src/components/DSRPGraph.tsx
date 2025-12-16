@@ -374,7 +374,7 @@ export function DSRPGraph({ concept, result, onNodeClick, conceptMap, showConcep
             labelFill: (d: any) => d.data?.textColor || '#333',
             labelFontSize: (d: any) => d.data?.isMain ? 14 : 12,
             labelFontWeight: (d: any) => d.data?.isMain ? 600 : 400,
-            labelFontFamily: 'Calibri, -apple-system, sans-serif',
+            labelFontFamily: "'IBM Plex Sans', -apple-system, sans-serif",
             labelPlacement: 'center',
           },
           state: {
@@ -654,7 +654,7 @@ export function DSRPGraph({ concept, result, onNodeClick, conceptMap, showConcep
           flex: 1;
           padding: 15px;
           overflow-y: auto;
-          font-family: Calibri, -apple-system, sans-serif;
+          font-family: 'IBM Plex Sans', -apple-system, sans-serif;
         }
         .panel-content p {
           margin: 0;
@@ -690,11 +690,13 @@ export function DSRPGraph({ concept, result, onNodeClick, conceptMap, showConcep
           display: flex;
           gap: 20px;
           font-size: 11px;
-          font-family: Calibri, -apple-system, sans-serif;
-          background: rgba(255,255,255,0.95);
+          font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+          background: rgba(22, 33, 62, 0.95);
+          color: rgba(255,255,255,0.8);
           padding: 8px 14px;
           border-radius: 6px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+          border: 1px solid rgba(255,255,255,0.1);
           transition: bottom 0.1s ease;
         }
         .legend-section {
@@ -704,7 +706,7 @@ export function DSRPGraph({ concept, result, onNodeClick, conceptMap, showConcep
         }
         .legend-title {
           font-weight: 600;
-          color: #555;
+          color: rgba(255,255,255,0.5);
         }
       `}</style>
     </div >

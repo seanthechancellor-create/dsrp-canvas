@@ -216,6 +216,114 @@ async def _store_related_concepts(typedb, concept_id: str, result: dict):
         logger.warning(f"Failed to store related concepts: {e}")
 
 
+@router.post("/mock", response_model=AnalysisResponse)
+async def mock_analyze(request: AnalysisRequest):
+    """
+    Mock DSRP analysis for testing visualization without API key.
+    Returns realistic sample data based on the move type.
+    """
+    concept = request.concept
+    move = request.move
+
+    mock_responses = {
+        "is-is-not": {
+            "pattern": "D",
+            "elements": {
+                "identity": f"{concept} is a distinct concept with unique properties, characteristics, and boundaries that define its essential nature",
+                "other": f"Not-{concept} includes everything outside the boundaries: contrasting concepts, opposites, and alternatives"
+            },
+            "move": "is-is-not",
+            "reasoning": f"Applying Distinction pattern to '{concept}': identifying what makes it unique (identity) and what differentiates it from other concepts (other).",
+            "related_concepts": [f"core-{concept}", f"anti-{concept}", "boundary"],
+            "confidence": 0.92
+        },
+        "zoom-in": {
+            "pattern": "S",
+            "elements": {
+                "parts": [
+                    f"Component A of {concept}",
+                    f"Component B of {concept}",
+                    f"Core element of {concept}",
+                    f"Foundation of {concept}"
+                ],
+                "whole": concept
+            },
+            "move": "zoom-in",
+            "reasoning": f"Breaking down '{concept}' into its constituent parts using the Systems pattern (part/whole).",
+            "related_concepts": ["structure", "components", "elements"],
+            "confidence": 0.88
+        },
+        "zoom-out": {
+            "pattern": "S",
+            "elements": {
+                "whole": f"Broader context containing {concept}",
+                "context": f"{concept} exists within a larger system of related concepts and processes"
+            },
+            "move": "zoom-out",
+            "reasoning": f"Examining the larger system that contains '{concept}' - what is it a part of?",
+            "related_concepts": ["context", "environment", "supersystem"],
+            "confidence": 0.85
+        },
+        "part-party": {
+            "pattern": "S",
+            "elements": {
+                "parts": [
+                    f"Element 1 of {concept}",
+                    f"Element 2 of {concept}",
+                    f"Element 3 of {concept}",
+                    f"Element 4 of {concept}"
+                ],
+                "relationships": [
+                    "Element 1 connects to Element 2",
+                    "Element 2 supports Element 3",
+                    "Element 3 enables Element 4"
+                ]
+            },
+            "move": "part-party",
+            "reasoning": f"Analyzing both the parts of '{concept}' AND the relationships between those parts.",
+            "related_concepts": ["interconnection", "structure", "network"],
+            "confidence": 0.87
+        },
+        "rds-barbell": {
+            "pattern": "R",
+            "elements": {
+                "action": concept,
+                "reactions": [
+                    f"Effect 1 caused by {concept}",
+                    f"Consequence of {concept}",
+                    f"Response to {concept}",
+                    f"Outcome from {concept}"
+                ]
+            },
+            "move": "rds-barbell",
+            "reasoning": f"Mapping the action/reaction relationships of '{concept}' using the RDS Barbell method.",
+            "related_concepts": ["cause", "effect", "feedback"],
+            "confidence": 0.90
+        },
+        "p-circle": {
+            "pattern": "P",
+            "elements": {
+                "perspectives": [
+                    {"point": "User perspective", "view": f"How users interact with and experience {concept}"},
+                    {"point": "Technical perspective", "view": f"The technical implementation and structure of {concept}"},
+                    {"point": "Business perspective", "view": f"The value and ROI of {concept}"},
+                    {"point": "Historical perspective", "view": f"How {concept} evolved over time"}
+                ]
+            },
+            "move": "p-circle",
+            "reasoning": f"Examining '{concept}' from multiple perspectives (point/view pairs).",
+            "related_concepts": ["viewpoint", "stakeholder", "lens"],
+            "confidence": 0.89
+        }
+    }
+
+    response = mock_responses.get(move, mock_responses["is-is-not"])
+    response["concept"] = concept
+    response["provider"] = "mock"
+
+    return AnalysisResponse(**response)
+
+
 @router.post("/batch")
 async def batch_analyze(
     concepts: list[str] = Body(...),

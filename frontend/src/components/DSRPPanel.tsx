@@ -44,7 +44,7 @@ export function DSRPPanel({ onAnalysisComplete, onClear, drillDownConcept, initi
   const [selectedMove, setSelectedMove] = useState<string>(initialMove || 'is-is-not')
   const [selectedConcept, setSelectedConcept] = useState<string>('')
 
-  const { analyze, isAnalyzing, result, error } = useDSRPAnalysis()
+  const { analyze, isAnalyzing, result, error, useMock, toggleMock } = useDSRPAnalysis()
   const { exportToMarkdown, downloadFile, isExporting } = useExport()
   const { concepts, fetchConcepts } = useConceptStore()
 
@@ -203,6 +203,20 @@ export function DSRPPanel({ onAnalysisComplete, onClear, drillDownConcept, initi
         </button>
       </div>
 
+      {/* Mock Mode Toggle */}
+      <div className="section mock-toggle">
+        <label className="toggle-label">
+          <input
+            type="checkbox"
+            checked={useMock}
+            onChange={toggleMock}
+          />
+          <span className="toggle-text">
+            {useMock ? '🧪 Mock Mode (Testing)' : '🤖 AI Mode (Requires API Key)'}
+          </span>
+        </label>
+      </div>
+
       {/* Error Message */}
       {error && (
         <div className="error-message" style={{ color: '#ff6b6b', fontSize: '12px', marginBottom: '10px', textAlign: 'center' }}>
@@ -242,7 +256,7 @@ export function DSRPPanel({ onAnalysisComplete, onClear, drillDownConcept, initi
           flex-direction: column;
           padding: 16px;
           overflow-y: auto;
-          font-family: Calibri, -apple-system, sans-serif;
+          font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
         }
         .panel-header h2 {
           font-size: 16px;
@@ -410,6 +424,28 @@ export function DSRPPanel({ onAnalysisComplete, onClear, drillDownConcept, initi
         .action-btn.clear:hover {
           border-color: #e74c3c;
           color: #e74c3c;
+        }
+        .mock-toggle {
+          padding: 8px;
+          background: rgba(255,255,255,0.03);
+          border-radius: 6px;
+          margin-bottom: 10px;
+        }
+        .toggle-label {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+          font-size: 12px;
+          color: #aaa;
+        }
+        .toggle-label input {
+          width: 16px;
+          height: 16px;
+          cursor: pointer;
+        }
+        .toggle-text {
+          flex: 1;
         }
       `}</style>
     </aside>

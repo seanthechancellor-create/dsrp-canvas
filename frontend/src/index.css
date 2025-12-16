@@ -5,20 +5,21 @@
 }
 
 :root {
-  --sidebar-width: 280px;
+  --sidebar-width: 260px;
   --panel-width: 320px;
-  --color-bg: #1a1a2e;
+  --color-bg: #0a0a0f;
   --color-surface: #16213e;
   --color-primary: #0f3460;
   --color-accent: #e94560;
   --color-text: #eaeaea;
   --color-text-muted: #a0a0a0;
+  --color-border: rgba(255, 255, 255, 0.1);
 
-  /* DSRP Pattern Colors */
-  --color-distinction: #ff6b6b;
-  --color-system: #4ecdc4;
-  --color-relationship: #ffe66d;
-  --color-perspective: #95e1d3;
+  /* DSRP Pattern Colors - refined for better visibility */
+  --color-distinction: #1976D2;
+  --color-system: #388E3C;
+  --color-relationship: #F57C00;
+  --color-perspective: #7B1FA2;
 }
 
 html, body, #root {
@@ -28,9 +29,11 @@ html, body, #root {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: var(--color-bg);
   color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .app-container {
@@ -43,9 +46,39 @@ body {
   flex: 1;
   position: relative;
   height: 100%;
+  background: linear-gradient(180deg, #0a0a0f 0%, #0d1117 100%);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Button reset */
+button {
+  font-family: inherit;
 }
 
 /* Override tldraw styles for dark theme integration */
 .tl-theme__dark {
   --color-background: var(--color-bg);
+}
+
+/* Selection highlight */
+::selection {
+  background: rgba(233, 69, 96, 0.3);
 }

@@ -1,174 +1,165 @@
 define
 
 # ============================================================================
-# DSRP Knowledge Graph Schema
+# DSRP Knowledge Graph Schema (TypeDB 3.x compatible)
 # Based on DSRP Theory (Distinctions, Systems, Relationships, Perspectives)
 # 4 Patterns, 8 Elements, 3 Dynamics
 # ============================================================================
 
+# --- Attributes ---
+attribute concept_id, value string;
+attribute source_id, value string;
+attribute analysis_id, value string;
+attribute note_id, value string;
+attribute distinction_id, value string;
+attribute system_id, value string;
+attribute relationship_id, value string;
+attribute perspective_id, value string;
+attribute extraction_id, value string;
+attribute analysis_link_id, value string;
+attribute note_link_id, value string;
+
+attribute name, value string;
+attribute description, value string;
+attribute extracted_text, value string;
+attribute note_content, value string;
+attribute reasoning, value string;
+
+attribute source_type, value string;
+attribute pattern_type, value string;
+attribute element_type, value string;
+attribute move_type, value string;
+attribute relationship_type, value string;
+attribute extraction_method, value string;
+
+attribute file_path, value string;
+attribute original_filename, value string;
+
+attribute canvas_x, value double;
+attribute canvas_y, value double;
+attribute canvas_scale, value double;
+attribute note_color, value string;
+
+attribute distinction_label, value string;
+attribute system_label, value string;
+attribute relationship_label, value string;
+attribute perspective_label, value string;
+
+attribute confidence_score, value double;
+attribute page_number, value long;
+attribute timestamp_start, value double;
+attribute timestamp_end, value double;
+attribute created_at, value datetime;
+attribute updated_at, value datetime;
+
 # --- Core Concept Entity ---
-concept sub entity,
-    owns concept-id @key,
+entity dsrp_concept,
+    owns concept_id @key,
     owns name,
     owns description,
-    owns created-at,
-    owns updated-at,
+    owns created_at,
+    owns updated_at,
     plays distinction:identity,
     plays distinction:other,
-    plays system-structure:whole,
-    plays system-structure:part,
-    plays relationship-link:action,
-    plays relationship-link:reaction,
-    plays perspective-view:point,
-    plays perspective-view:view,
-    plays analysis:subject;
+    plays system_structure:whole,
+    plays system_structure:part,
+    plays relationship_link:action,
+    plays relationship_link:reaction,
+    plays perspective_view:point,
+    plays perspective_view:view,
+    plays extraction:extracted,
+    plays analysis_rel:subject,
+    plays note_link:linked_concept;
 
 # --- Source Material Entity ---
-source sub entity,
-    owns source-id @key,
-    owns source-type,  # pdf, video, audio
-    owns file-path,
-    owns original-filename,
-    owns extracted-text,
-    owns created-at,
-    plays extraction:source-material,
-    plays analysis:source-reference;
+entity source,
+    owns source_id @key,
+    owns source_type,
+    owns file_path,
+    owns original_filename,
+    owns extracted_text,
+    owns created_at,
+    plays extraction:source_material,
+    plays analysis_rel:source_reference;
 
 # --- DSRP Analysis Entity ---
-dsrp-analysis sub entity,
-    owns analysis-id @key,
-    owns pattern-type,  # D, S, R, P
-    owns element-type,  # i, o, p, w, a, r, point, view
-    owns move-type,     # is-is-not, zoom-in, zoom-out, part-party, rds-barbell, p-circle
+entity dsrp_analysis,
+    owns analysis_id @key,
+    owns pattern_type,
+    owns element_type,
+    owns move_type,
     owns reasoning,
-    owns confidence-score,
-    owns created-at,
-    plays analysis:result;
+    owns confidence_score,
+    owns created_at,
+    plays analysis_rel:result;
 
 # --- Canvas Note Entity (for UI) ---
-canvas-note sub entity,
-    owns note-id @key,
-    owns canvas-x,
-    owns canvas-y,
-    owns canvas-scale,
-    owns note-content,
-    owns note-color,
-    owns created-at,
-    plays note-link:note,
-    plays note-link:linked-concept;
+entity canvas_note,
+    owns note_id @key,
+    owns canvas_x,
+    owns canvas_y,
+    owns canvas_scale,
+    owns note_content,
+    owns note_color,
+    owns created_at,
+    plays note_link:note;
 
 # ============================================================================
 # DSRP Pattern Relations (The 4 Patterns)
 # ============================================================================
 
 # D - Distinction: identity/other
-distinction sub relation,
-    owns distinction-id @key,
-    owns distinction-label,
+relation distinction,
+    owns distinction_id @key,
+    owns distinction_label,
     relates identity,
     relates other;
 
 # S - System: part/whole
-system-structure sub relation,
-    owns system-id @key,
-    owns system-label,
+relation system_structure,
+    owns system_id @key,
+    owns system_label,
     relates whole,
     relates part;
 
 # R - Relationship: action/reaction
-relationship-link sub relation,
-    owns relationship-id @key,
-    owns relationship-label,
-    owns relationship-type,  # causal, correlative, structural, etc.
+relation relationship_link,
+    owns relationship_id @key,
+    owns relationship_label,
+    owns relationship_type,
     relates action,
     relates reaction;
 
 # P - Perspective: point/view
-perspective-view sub relation,
-    owns perspective-id @key,
-    owns perspective-label,
-    relates point,   # the observer
-    relates view;    # what is observed
+relation perspective_view,
+    owns perspective_id @key,
+    owns perspective_label,
+    relates point,
+    relates view;
 
 # ============================================================================
 # Supporting Relations
 # ============================================================================
 
 # Links sources to extracted concepts
-extraction sub relation,
-    owns extraction-id @key,
-    owns extraction-method,
-    owns page-number,
-    owns timestamp-start,
-    owns timestamp-end,
-    relates source-material,
-    relates extracted as concept;
+relation extraction,
+    owns extraction_id @key,
+    owns extraction_method,
+    owns page_number,
+    owns timestamp_start,
+    owns timestamp_end,
+    relates source_material,
+    relates extracted;
 
 # Links concepts to their DSRP analyses
-analysis sub relation,
-    owns analysis-link-id @key,
-    relates subject as concept,
-    relates source-reference as source,
-    relates result as dsrp-analysis;
+relation analysis_rel,
+    owns analysis_link_id @key,
+    relates subject,
+    relates source_reference,
+    relates result;
 
 # Links canvas notes to concepts
-note-link sub relation,
-    owns note-link-id @key,
-    relates note as canvas-note,
-    relates linked-concept as concept;
-
-# ============================================================================
-# Attributes
-# ============================================================================
-
-# IDs
-concept-id sub attribute, value string;
-source-id sub attribute, value string;
-analysis-id sub attribute, value string;
-note-id sub attribute, value string;
-distinction-id sub attribute, value string;
-system-id sub attribute, value string;
-relationship-id sub attribute, value string;
-perspective-id sub attribute, value string;
-extraction-id sub attribute, value string;
-analysis-link-id sub attribute, value string;
-note-link-id sub attribute, value string;
-
-# Content
-name sub attribute, value string;
-description sub attribute, value string;
-extracted-text sub attribute, value string;
-note-content sub attribute, value string;
-reasoning sub attribute, value string;
-
-# Classification
-source-type sub attribute, value string;
-pattern-type sub attribute, value string;
-element-type sub attribute, value string;
-move-type sub attribute, value string;
-relationship-type sub attribute, value string;
-extraction-method sub attribute, value string;
-
-# File info
-file-path sub attribute, value string;
-original-filename sub attribute, value string;
-
-# Canvas positioning
-canvas-x sub attribute, value double;
-canvas-y sub attribute, value double;
-canvas-scale sub attribute, value double;
-note-color sub attribute, value string;
-
-# Labels
-distinction-label sub attribute, value string;
-system-label sub attribute, value string;
-relationship-label sub attribute, value string;
-perspective-label sub attribute, value string;
-
-# Metadata
-confidence-score sub attribute, value double;
-page-number sub attribute, value long;
-timestamp-start sub attribute, value double;
-timestamp-end sub attribute, value double;
-created-at sub attribute, value datetime;
-updated-at sub attribute, value datetime;
+relation note_link,
+    owns note_link_id @key,
+    relates note,
+    relates linked_concept;

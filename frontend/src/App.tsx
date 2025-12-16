@@ -2,6 +2,7 @@ import { useState, useCallback, Component, ReactNode } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { DSRPPanel } from './components/DSRPPanel'
 import { DSRPGraph } from './components/DSRPGraph'
+import { DetailsDrawer } from './components/DetailsDrawer'
 
 // Error boundary
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
@@ -64,6 +65,7 @@ function AppContent() {
   })
   const [drillDownConcept, setDrillDownConcept] = useState<string | null>(null)
   const [selectedMove, setSelectedMove] = useState<string>('is-is-not')
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
 
   // Add nodes and edges to the cumulative concept map
   const addToConceptMap = useCallback((newConcept: string, newResult: AnalysisResult) => {
@@ -180,6 +182,7 @@ function AppContent() {
     setResult(newResult)
     addToConceptMap(newConcept, newResult)
     setDrillDownConcept(null) // Clear drill-down after analysis
+    setIsDrawerOpen(true) // Open drawer to show analysis details
   }, [addToConceptMap])
 
   const handleNodeClick = useCallback((nodeId: string, label: string) => {
@@ -198,6 +201,15 @@ function AppContent() {
   const handleClear = useCallback(() => {
     setConcept('')
     setResult(null)
+    setIsDrawerOpen(false)
+  }, [])
+
+  const handleDrawerDrillDown = useCallback((conceptName: string) => {
+    setDrillDownConcept(conceptName)
+  }, [])
+
+  const handleDrawerClose = useCallback(() => {
+    setIsDrawerOpen(false)
   }, [])
 
   const handleClearMap = useCallback(() => {
@@ -246,6 +258,15 @@ function AppContent() {
         onClear={handleClear}
         drillDownConcept={drillDownConcept}
         initialMove={selectedMove}
+      />
+
+      {/* Details Drawer - shows when analysis completes */}
+      <DetailsDrawer
+        isOpen={isDrawerOpen}
+        onClose={handleDrawerClose}
+        concept={concept}
+        result={result}
+        onDrillDown={handleDrawerDrillDown}
       />
 
       <style>{`
