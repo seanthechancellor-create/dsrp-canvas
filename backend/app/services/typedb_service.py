@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 TYPEDB_HOST = os.getenv("TYPEDB_HOST", "127.0.0.1")
 TYPEDB_PORT = os.getenv("TYPEDB_PORT", "1729")
 TYPEDB_ADDRESS = f"{TYPEDB_HOST}:{TYPEDB_PORT}"
-TYPEDB_DATABASE = os.getenv("TYPEDB_DATABASE", "dsrp_canvas")
+TYPEDB_DATABASE = os.getenv("TYPEDB_DATABASE", "dsrp_483")
 TYPEDB_USERNAME = os.getenv("TYPEDB_USERNAME", "admin")
 TYPEDB_PASSWORD = os.getenv("TYPEDB_PASSWORD", "password")
 
