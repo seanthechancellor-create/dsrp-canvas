@@ -13,14 +13,14 @@ interface DSRPResult {
 // Use relative URL to go through Vite proxy, fallback to direct backend URL
 const API_URL = import.meta.env.VITE_API_URL || ''
 
-// Default to mock mode (set to true for testing without API key)
-const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
+// Default to mock mode from environment (set VITE_USE_MOCK=false to disable)
+const DEFAULT_USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
 
 export function useDSRPAnalysis() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [result, setResult] = useState<DSRPResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [useMock, setUseMock] = useState(true) // Default to mock mode
+  const [useMock, setUseMock] = useState(DEFAULT_USE_MOCK)
 
   const analyze = async (concept: string, move: string) => {
     setIsAnalyzing(true)

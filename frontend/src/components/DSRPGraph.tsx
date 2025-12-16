@@ -429,8 +429,9 @@ export function DSRPGraph({ concept, result, onNodeClick, conceptMap, showConcep
           return
         }
 
-        const title = nodeData.data?.fullLabel || nodeData.data?.label || nodeId
-        const content = nodeData.data?.fullText || nodeData.data?.fullLabel || 'No details available'
+        const data = nodeData.data as Record<string, unknown> | undefined
+        const title = String(data?.fullLabel || data?.label || nodeId)
+        const content = String(data?.fullText || data?.fullLabel || 'No details available')
 
         console.log('Node clicked:', { nodeId, title, content: content.slice(0, 100) })
 
