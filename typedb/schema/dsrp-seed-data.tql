@@ -1,6 +1,6 @@
 # ============================================================================
 # DSRP 4-8-3 Seed Data
-# Initial data for the 6 Moves
+# Initial data for the 8 Moves (6 core + 2 causal)
 # ============================================================================
 
 insert
@@ -56,3 +56,23 @@ $m6 isa dsrp_move,
     has move_pattern "P",
     has move_question "From what PERSPECTIVES can this be viewed? What does each perspective SEE?",
     has description "Map multiple perspectives around a concept. Each perspective has a point (the viewer) and a view (what they see).";
+
+# ----------------------------------------------------------------------------
+# CAUSAL MOVES (WoC / WAoC)
+# ----------------------------------------------------------------------------
+
+# Move 7: Web of Causality (Forward Causal Analysis)
+$m7 isa dsrp_move,
+    has move_id "woc",
+    has move_name "Web of Causality",
+    has move_pattern "R",
+    has move_question "If this CHANGES, what EFFECTS ripple through the system?",
+    has description "Map the downstream effects of changing this concept. Follow cause-effect chains forward to understand the ripple effects and unintended consequences. WoC reveals how changes propagate through interconnected systems.";
+
+# Move 8: Web of Anticausality (Root Cause Analysis)
+$m8 isa dsrp_move,
+    has move_id "waoc",
+    has move_name "Web of Anticausality",
+    has move_pattern "R",
+    has move_question "What ROOT CAUSES led to this current state?",
+    has description "Trace backwards from the current state to identify root causes. Follow effect-cause chains backward to understand why things are the way they are. WAoC reveals the historical and systemic factors that created the present situation.";

@@ -114,7 +114,14 @@ entity thing @abstract,
     # Moves
     plays move_application:target,
     # Sources
-    plays extraction:extracted;
+    plays extraction:extracted,
+    # Causality (WoC/WAoC)
+    plays causal_link:cause,
+    plays causal_link:effect,
+    plays causal_chain:chain_origin,
+    plays causal_chain:chain_terminus,
+    plays web_of_causality:focal_cause,
+    plays web_of_anticausality:focal_effect;
 
 # ============================================================================
 # CONCRETE THING TYPES
@@ -381,7 +388,106 @@ relation extraction,
     relates extracted;
 
 # ============================================================================
-# INITIAL DATA: The 6 Moves
+# WEB OF CAUSALITY (WoC) / WEB OF ANTICAUSALITY (WAoC)
+# Extensions to the R (Relationships) pattern for causal analysis
+# ============================================================================
+
+# Attributes for causality
+attribute causal_link_id, value string;
+attribute causal_chain_id, value string;
+attribute web_id, value string;
+attribute causal_direction, value string;   # "forward" (WoC) or "backward" (WAoC)
+attribute causal_strength, value double;    # 0.0 to 1.0 strength of causal link
+attribute temporal_order, value integer;    # Order in causal chain (1, 2, 3...)
+attribute time_horizon, value string;       # "immediate", "short-term", "long-term"
+attribute causal_type, value string;        # "direct", "indirect", "feedback", "circular"
+
+# ----------------------------------------------------------------------------
+# CAUSAL LINK: A single cause → effect relationship
+# Extends the R pattern's action/reaction with directionality and strength
+# ----------------------------------------------------------------------------
+relation causal_link,
+    owns causal_link_id @key,
+    owns causal_strength,
+    owns causal_type,
+    owns time_horizon,
+    owns reasoning,
+    owns created_at,
+    # The cause (what produces the effect)
+    relates cause,
+    # The effect (what is produced by the cause)
+    relates effect,
+    # Can be part of a chain
+    plays causal_chain:chain_link,
+    # Can be distinguished, systematized, perspectived
+    plays distinction:identity,
+    plays distinction:other,
+    plays system_structure:part,
+    plays system_structure:whole,
+    plays perspective_view:point,
+    plays perspective_view:view;
+
+# ----------------------------------------------------------------------------
+# CAUSAL CHAIN: A sequence of causal links (A → B → C → D)
+# Represents a path through the causal web
+# ----------------------------------------------------------------------------
+relation causal_chain,
+    owns causal_chain_id @key,
+    owns causal_direction,
+    owns temporal_order,
+    owns reasoning,
+    owns created_at,
+    # The links that form this chain
+    relates chain_link,
+    # The origin of the chain
+    relates chain_origin,
+    # The terminus of the chain
+    relates chain_terminus,
+    # Chains belong to webs
+    plays web_of_causality:web_chain,
+    plays web_of_anticausality:web_chain;
+
+# ----------------------------------------------------------------------------
+# WEB OF CAUSALITY (WoC): Forward-looking causal analysis
+# "If I change X, what effects ripple through the system?"
+# Maps all downstream effects of a change
+# ----------------------------------------------------------------------------
+relation web_of_causality,
+    owns web_id @key,
+    owns reasoning,
+    owns created_at,
+    # The focal point - what we're analyzing effects FROM
+    relates focal_cause,
+    # All the causal chains emanating from the focal point
+    relates web_chain,
+    # Can be viewed from perspectives
+    plays perspective_view:point,
+    plays perspective_view:view,
+    plays perspective_view:perspectived_thing;
+
+# ----------------------------------------------------------------------------
+# WEB OF ANTICAUSALITY (WAoC): Backward-looking root cause analysis
+# "What caused this current state?"
+# Maps all upstream causes leading to a state
+# ----------------------------------------------------------------------------
+relation web_of_anticausality,
+    owns web_id @key,
+    owns reasoning,
+    owns created_at,
+    # The focal point - what we're analyzing causes OF
+    relates focal_effect,
+    # All the causal chains leading to the focal point
+    relates web_chain,
+    # Can be viewed from perspectives
+    plays perspective_view:point,
+    plays perspective_view:view,
+    plays perspective_view:perspectived_thing;
+
+# Allow things to participate in causal relations
+# (Added to thing entity via plays declarations)
+
+# ============================================================================
+# INITIAL DATA: The 6 Moves + 2 Causal Moves
 # These would be inserted as data, but documented here for reference:
 #
 # 1. Is/Is Not (D) - "What is X? What is X not?"
@@ -390,4 +496,6 @@ relation extraction,
 # 4. Part-Party (S) - "What are the parts and how do they relate?"
 # 5. RDS Barbell (R) - "Relate → Distinguish → Systematize"
 # 6. P-Circle (P) - "What perspectives can view X?"
+# 7. WoC Analysis (R) - "If X changes, what effects ripple out?"
+# 8. WAoC Analysis (R) - "What root causes led to X?"
 # ============================================================================

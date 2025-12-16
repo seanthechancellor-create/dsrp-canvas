@@ -20,13 +20,15 @@ class DSRPPattern(str, Enum):
 
 
 class DSRPMove(str, Enum):
-    """The 6 DSRP moves."""
+    """The 8 DSRP moves (6 core + 2 causal)."""
     IS_IS_NOT = "is-is-not"
     ZOOM_IN = "zoom-in"
     ZOOM_OUT = "zoom-out"
     PART_PARTY = "part-party"
     RDS_BARBELL = "rds-barbell"
     P_CIRCLE = "p-circle"
+    WOC = "woc"      # Web of Causality
+    WAOC = "waoc"    # Web of Anticausality
 
 
 class DSRPDynamic(str, Enum):
@@ -115,6 +117,20 @@ DSRP_MOVES = {
         "pattern": "P",
         "description": "Map perspectives",
         "question": "Who sees this differently and what do they see?",
+    },
+    "woc": {
+        "id": "woc",
+        "name": "Web of Causality",
+        "pattern": "R",
+        "description": "Forward causal analysis - map downstream effects",
+        "question": "If this changes, what effects ripple through the system?",
+    },
+    "waoc": {
+        "id": "waoc",
+        "name": "Web of Anticausality",
+        "pattern": "R",
+        "description": "Root cause analysis - trace upstream causes",
+        "question": "What root causes led to this current state?",
     },
 }
 

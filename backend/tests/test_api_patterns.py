@@ -33,14 +33,14 @@ class TestDSRPFrameworkAPI:
         assert "R" in patterns
         assert "P" in patterns
 
-    def test_framework_has_six_moves(self, client: TestClient):
-        """Test that framework includes all 6 moves."""
+    def test_framework_has_eight_moves(self, client: TestClient):
+        """Test that framework includes all 8 moves (6 core + 2 causal)."""
         response = client.get("/api/dsrp/framework")
         data = response.json()
 
         moves = data["moves"]
-        assert len(moves) == 6
-        expected_moves = ["is-is-not", "zoom-in", "zoom-out", "part-party", "rds-barbell", "p-circle"]
+        assert len(moves) == 8
+        expected_moves = ["is-is-not", "zoom-in", "zoom-out", "part-party", "rds-barbell", "p-circle", "woc", "waoc"]
         for move in expected_moves:
             assert move in moves
 
@@ -157,7 +157,7 @@ class TestMovesAPI:
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
-        assert len(data) == 6
+        assert len(data) == 8
 
     def test_move_structure(self, client: TestClient):
         """Test that each move has required fields."""
@@ -197,6 +197,26 @@ class TestMovesAPI:
         assert data["id"] == "p-circle"
         assert data["pattern"] == "P"
 
+    def test_get_move_woc(self, client: TestClient):
+        """Test getting Web of Causality move."""
+        response = client.get("/api/dsrp/moves/woc")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == "woc"
+        assert data["name"] == "Web of Causality"
+        assert data["pattern"] == "R"
+
+    def test_get_move_waoc(self, client: TestClient):
+        """Test getting Web of Anticausality move."""
+        response = client.get("/api/dsrp/moves/waoc")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == "waoc"
+        assert data["name"] == "Web of Anticausality"
+        assert data["pattern"] == "R"
+
     def test_get_move_invalid(self, client: TestClient):
         """Test that invalid move ID returns error."""
         response = client.get("/api/dsrp/moves/invalid-move")
@@ -215,6 +235,8 @@ class TestMovesAPI:
             "part-party": "S",
             "rds-barbell": "R",
             "p-circle": "P",
+            "woc": "R",
+            "waoc": "R",
         }
 
         for move_id, expected_pattern in expected_mapping.items():
