@@ -14,7 +14,7 @@ export interface DSRPElements {
 // The 3 Dynamics
 export type DSRPDynamic = 'equality' | 'coimplication' | 'simultaneity'
 
-// The 6 Moves
+// The 8 Moves (6 core + 2 causal)
 export type DSRPMove =
   | 'is-is-not'
   | 'zoom-in'
@@ -22,6 +22,8 @@ export type DSRPMove =
   | 'part-party'
   | 'rds-barbell'
   | 'p-circle'
+  | 'woc'   // Web of Causality
+  | 'waoc'  // Web of Anticausality
 
 export interface Concept {
   id: string

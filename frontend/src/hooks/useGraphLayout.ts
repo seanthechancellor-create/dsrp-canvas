@@ -99,6 +99,26 @@ const LAYOUT_CONFIGS: Record<DSRPMove, LayoutConfig> = {
     nodeSpacing: 30,
     sortBy: 'degree',
   },
+
+  // Web of Causality: Left-to-right causal flow (cause → effect)
+  'woc': {
+    type: 'dagre',
+    rankdir: 'LR',
+    align: 'UL',
+    nodesep: 60,
+    ranksep: 120,
+    controlPoints: true,
+  },
+
+  // Web of Anticausality: Right-to-left root cause flow (effect ← cause)
+  'waoc': {
+    type: 'dagre',
+    rankdir: 'RL',
+    align: 'UR',
+    nodesep: 60,
+    ranksep: 120,
+    controlPoints: true,
+  },
 }
 
 // Alternative layouts for special cases
@@ -230,6 +250,16 @@ export function useGraphLayout() {
         name: 'Radial',
         description: 'Perspectives around central concept',
         icon: '🎯',
+      },
+      'woc': {
+        name: 'Causal Flow',
+        description: 'Forward effects from cause to consequences',
+        icon: '➡️',
+      },
+      'waoc': {
+        name: 'Root Cause Flow',
+        description: 'Backward trace from effect to root causes',
+        icon: '⬅️',
       },
     }),
     []

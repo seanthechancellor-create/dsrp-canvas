@@ -19,13 +19,15 @@ interface DSRPPanelProps {
   initialMove?: string
 }
 
-const SIX_MOVES = [
+const DSRP_MOVES = [
   { id: 'is-is-not', name: 'Is/Is Not', pattern: 'D', description: 'Define what it IS and IS NOT' },
   { id: 'zoom-in', name: 'Zoom In', pattern: 'S', description: 'Examine the parts' },
   { id: 'zoom-out', name: 'Zoom Out', pattern: 'S', description: 'Examine the whole' },
   { id: 'part-party', name: 'Part Party', pattern: 'S', description: 'Parts + relationships' },
   { id: 'rds-barbell', name: 'RDS Barbell', pattern: 'R', description: 'Relate → Distinguish → Systematize' },
   { id: 'p-circle', name: 'P-Circle', pattern: 'P', description: 'Map perspectives' },
+  { id: 'woc', name: 'WoC', pattern: 'R', description: 'Web of Causality - forward effects' },
+  { id: 'waoc', name: 'WAoC', pattern: 'R', description: 'Web of Anticausality - root causes' },
 ]
 
 const DYNAMICS = [
@@ -154,11 +156,11 @@ export function DSRPPanel({ onAnalysisComplete, onClear, drillDownConcept, initi
         </div>
       </div>
 
-      {/* 6 Moves */}
+      {/* 8 Moves */}
       <div className="section">
-        <h3>6 Moves</h3>
+        <h3>8 Moves</h3>
         <div className="moves-list">
-          {SIX_MOVES.map((move) => (
+          {DSRP_MOVES.map((move) => (
             <button
               key={move.id}
               className={`move-btn ${selectedMove === move.id ? 'selected' : ''}`}
