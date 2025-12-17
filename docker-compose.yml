@@ -45,6 +45,21 @@ services:
       timeout: 5s
       retries: 5
 
+  # MongoDB for Vector Search (Episodic Memory)
+  mongodb:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./documents:/documents  # Shared folder for document ingestion
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
   # FastAPI Backend
   backend:
     build:
@@ -63,15 +78,19 @@ services:
       - TYPEDB_PORT=1729
       - POSTGRES_URL=postgresql://dsrp:dsrp_password@postgres:5432/dsrp_canvas
       - REDIS_URL=redis://redis:6379/0
+      - MONGODB_URL=mongodb://mongodb:27017/dsrp_knowledge
     volumes:
       - ./backend:/app
       - ./uploads:/app/uploads
+      - ./documents:/app/documents
     depends_on:
       typedb:
         condition: service_healthy
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      mongodb:
         condition: service_healthy
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
@@ -112,7 +131,37 @@ services:
       - backend
     command: npm run dev -- --host
 
+  # DSRP Knowledge Ingestion Pipeline
+  # Processes documents, extracts DSRP patterns, stores in MongoDB + TypeDB
+  # Usage: docker-compose run pipeline python ingest.py
+  pipeline:
+    build:
+      context: ./pipeline
+      dockerfile: Dockerfile
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - TYPEDB_HOST=typedb
+      - TYPEDB_PORT=1729
+      - TYPEDB_DATABASE=dsrp_483
+      - TYPEDB_USERNAME=admin
+      - TYPEDB_PASSWORD=password
+      - MONGODB_URL=mongodb://mongodb:27017/dsrp_knowledge
+    volumes:
+      - ./pipeline:/app
+      - ./documents:/app/documents
+    depends_on:
+      typedb:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    # By default, just keep container available for manual runs
+    # Use: docker-compose run pipeline python ingest.py
+    command: ["tail", "-f", "/dev/null"]
+    profiles:
+      - tools  # Only start with: docker-compose --profile tools up
+
 volumes:
   typedb_data:
   postgres_data:
   redis_data:
+  mongodb_data:
