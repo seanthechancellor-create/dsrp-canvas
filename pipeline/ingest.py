@@ -40,13 +40,34 @@ except ImportError:
     print("Warning: pypdf not installed. PDF support disabled. Run: pip install pypdf")
 
 # Text chunking
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # Embeddings (local, no API key needed)
 from sentence_transformers import SentenceTransformer
 
-# LLM for DSRP extraction
-import anthropic
+# LLM for DSRP extraction - supports multiple providers
+# Will auto-detect which API key is available
+HAS_ANTHROPIC = False
+HAS_GOOGLE = False
+HAS_OPENAI = False
+
+try:
+    import anthropic
+    HAS_ANTHROPIC = True
+except ImportError:
+    pass
+
+try:
+    import google.generativeai as genai
+    HAS_GOOGLE = True
+except ImportError:
+    pass
+
+try:
+    import openai
+    HAS_OPENAI = True
+except ImportError:
+    pass
 
 # Our services
 from services.mongodb_service import MongoDBService
@@ -68,10 +89,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Paths
-BASE_DIR = Path(__file__).parent.parent  # dsrp-canvas root
-INBOX_DIR = BASE_DIR / "documents" / "inbox"
-PROCESSED_DIR = BASE_DIR / "documents" / "processed"
+# Paths - work both locally and in Docker
+# In Docker, documents are mounted at /app/documents
+# Locally, they're at ../documents relative to this script
+BASE_DIR = Path(__file__).parent  # pipeline directory
+DOCS_DIR = BASE_DIR / "documents" if (BASE_DIR / "documents").exists() else BASE_DIR.parent / "documents"
+INBOX_DIR = DOCS_DIR / "inbox"
+PROCESSED_DIR = DOCS_DIR / "processed"
 
 # Chunking settings
 CHUNK_SIZE = 1500  # Characters (roughly 375 tokens)
@@ -80,8 +104,13 @@ CHUNK_OVERLAP = 200  # Characters of overlap between chunks
 # Embedding model (runs locally, no API needed)
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"  # 384 dimensions, fast and good
 
-# LLM settings
-CLAUDE_MODEL = "claude-sonnet-4-20250514"  # Good balance of speed and quality
+# LLM settings - supports multiple providers
+# Will auto-detect based on available API keys
+LLM_MODELS = {
+    "gemini": "gemini-2.0-flash",      # Google - fast and capable
+    "claude": "claude-sonnet-4-20250514",  # Anthropic - high quality
+    "openai": "gpt-4o-mini",           # OpenAI - balanced
+}
 
 
 # =============================================================================
@@ -130,17 +159,56 @@ class DSRPIngestionPipeline:
         logger.info("Connecting to TypeDB...")
         self.typedb = TypeDBService()
 
-        # Initialize Claude client
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            logger.warning("ANTHROPIC_API_KEY not set! DSRP extraction will be skipped.")
-            self.claude = None
-        else:
-            self.claude = anthropic.Anthropic(api_key=api_key)
-            logger.info("Claude client initialized")
+        # Initialize LLM client (auto-detect available provider)
+        self.llm_provider = None
+        self.llm_client = None
+        self._init_llm()
 
         logger.info("Pipeline initialization complete!")
         logger.info("-" * 60)
+
+    def _init_llm(self):
+        """
+        Initialize LLM client, auto-detecting available providers.
+        Priority: Gemini > Claude > OpenAI (based on common availability)
+        """
+        # Check for Google Gemini first (user has this configured)
+        google_key = os.getenv("GOOGLE_API_KEY")
+        if google_key and HAS_GOOGLE:
+            try:
+                genai.configure(api_key=google_key)
+                self.llm_client = genai.GenerativeModel(LLM_MODELS["gemini"])
+                self.llm_provider = "gemini"
+                logger.info(f"LLM initialized: Google Gemini ({LLM_MODELS['gemini']})")
+                return
+            except Exception as e:
+                logger.warning(f"Failed to initialize Gemini: {e}")
+
+        # Check for Anthropic Claude
+        anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+        if anthropic_key and HAS_ANTHROPIC:
+            try:
+                self.llm_client = anthropic.Anthropic(api_key=anthropic_key)
+                self.llm_provider = "claude"
+                logger.info(f"LLM initialized: Anthropic Claude ({LLM_MODELS['claude']})")
+                return
+            except Exception as e:
+                logger.warning(f"Failed to initialize Claude: {e}")
+
+        # Check for OpenAI
+        openai_key = os.getenv("OPENAI_API_KEY")
+        if openai_key and HAS_OPENAI:
+            try:
+                self.llm_client = openai.OpenAI(api_key=openai_key)
+                self.llm_provider = "openai"
+                logger.info(f"LLM initialized: OpenAI ({LLM_MODELS['openai']})")
+                return
+            except Exception as e:
+                logger.warning(f"Failed to initialize OpenAI: {e}")
+
+        # No LLM available
+        logger.warning("No LLM API key found! DSRP extraction will be skipped.")
+        logger.warning("Set one of: GOOGLE_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY")
 
     def process_file(self, file_path: Path) -> dict:
         """
@@ -223,8 +291,8 @@ class DSRPIngestionPipeline:
 
             results["chunks_processed"] += 1
 
-            # STEP 4: Extract DSRP patterns using Claude
-            if self.claude:
+            # STEP 4: Extract DSRP patterns using LLM
+            if self.llm_client:
                 dsrp_data = self._extract_dsrp(
                     text=chunk_text,
                     chunk_number=i,
@@ -318,7 +386,8 @@ class DSRPIngestionPipeline:
         previous_summary: str
     ) -> Optional[dict]:
         """
-        Use Claude to extract DSRP patterns from a text chunk.
+        Use LLM to extract DSRP patterns from a text chunk.
+        Supports multiple providers: Gemini, Claude, OpenAI.
 
         Args:
             text: The text to analyze
@@ -330,6 +399,7 @@ class DSRPIngestionPipeline:
         Returns:
             Parsed JSON with DSRP patterns, or None on error
         """
+        response_text = ""
         try:
             # Build the prompt
             prompt = get_extraction_prompt(
@@ -340,24 +410,43 @@ class DSRPIngestionPipeline:
                 previous_summary=previous_summary
             )
 
-            # Call Claude
-            response = self.claude.messages.create(
-                model=CLAUDE_MODEL,
-                max_tokens=4096,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ]
-            )
+            # Call the appropriate LLM based on provider
+            if self.llm_provider == "gemini":
+                response = self.llm_client.generate_content(prompt)
+                response_text = response.text.strip()
 
-            # Extract the response text
-            response_text = response.content[0].text.strip()
+            elif self.llm_provider == "claude":
+                response = self.llm_client.messages.create(
+                    model=LLM_MODELS["claude"],
+                    max_tokens=4096,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                response_text = response.content[0].text.strip()
+
+            elif self.llm_provider == "openai":
+                response = self.llm_client.chat.completions.create(
+                    model=LLM_MODELS["openai"],
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=4096
+                )
+                response_text = response.choices[0].message.content.strip()
+
+            else:
+                logger.error("No LLM provider configured")
+                return None
 
             # Try to parse as JSON
-            # Sometimes Claude wraps in markdown code blocks
+            # Sometimes LLMs wrap in markdown code blocks
             if response_text.startswith("```"):
                 # Remove markdown code fence
                 lines = response_text.split("\n")
-                response_text = "\n".join(lines[1:-1])
+                # Find the closing fence
+                end_idx = len(lines) - 1
+                for i in range(len(lines) - 1, 0, -1):
+                    if lines[i].strip().startswith("```"):
+                        end_idx = i
+                        break
+                response_text = "\n".join(lines[1:end_idx])
 
             dsrp_data = json.loads(response_text)
 
@@ -377,7 +466,7 @@ class DSRPIngestionPipeline:
 
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse DSRP JSON: {e}")
-            logger.debug(f"Raw response: {response_text[:500]}...")
+            logger.debug(f"Raw response: {response_text[:500] if response_text else 'empty'}...")
             return None
 
         except Exception as e:

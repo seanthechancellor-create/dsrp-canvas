@@ -1,0 +1,55 @@
+PRIVACY POLICY FOR ACME CORPORATION
+
+1. INTRODUCTION
+
+This Privacy Policy explains how Acme Corporation ("we", "us", or "our") collects, uses, and protects your personal information. Privacy is the right to control your personal data. It is NOT the same as secrecy, which involves hiding information.
+
+2. DATA COLLECTION
+
+We collect two types of data:
+
+Personal Data: Information that identifies you directly, such as your name, email address, and phone number.
+
+Usage Data: Information about how you interact with our services, including browsing history and click patterns.
+
+From the user's perspective, data collection should be transparent and consensual. From the business perspective, data collection enables personalization and improved services.
+
+3. DATA PROCESSING
+
+Our data processing system consists of several components:
+- Data Ingestion Layer: Receives raw data from various sources
+- Processing Engine: Transforms and validates data
+- Storage Layer: Securely stores processed data
+- Analytics Module: Generates insights from stored data
+
+Each component relies on the others to function properly.
+
+4. LEGAL BASIS
+
+Under GDPR, we process data based on:
+- Consent: You have given clear consent
+- Contract: Processing is necessary for a contract
+- Legal Obligation: Processing is required by law
+- Legitimate Interest: Processing is in our legitimate business interest
+
+Failure to comply with GDPR can result in fines up to 4% of global annual revenue or €20 million, whichever is higher.
+
+5. YOUR RIGHTS
+
+Data subjects have the following rights:
+- Right to Access: Request copies of your data
+- Right to Rectification: Correct inaccurate data
+- Right to Erasure: Request deletion of your data
+- Right to Portability: Receive your data in a portable format
+
+From a regulator's perspective, these rights ensure individuals maintain control over their personal information. From a data processor's perspective, these rights create compliance obligations that must be carefully managed.
+
+6. DATA SECURITY
+
+Security measures protect data from unauthorized access. Technical measures include encryption, firewalls, and access controls. Organizational measures include staff training, policies, and regular audits.
+
+A data breach occurs when security fails, leading to potential harm for data subjects and regulatory consequences for the organization.
+
+7. CONTACT
+
+For privacy inquiries, contact our Data Protection Officer at privacy@acme.com.
