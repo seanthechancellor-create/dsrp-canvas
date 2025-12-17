@@ -20,13 +20,15 @@ Understanding this framework is essential for working on this codebase:
 
 **3 Dynamics:** Equality (=), Co-implication (⇔), Simultaneity (✷)
 
-**6 Moves (implemented in `backend/agents/dsrp_agent.py`):**
+**8 Moves (implemented in `backend/agents/dsrp_agent.py`):**
 1. Is/Is Not - Define boundaries (D)
 2. Zoom In - Examine parts (S)
 3. Zoom Out - Examine whole/context (S)
 4. Part Party - Parts + their relationships (S)
 5. RDS Barbell - Relate → Distinguish → Systematize (R)
 6. P-Circle - Map multiple perspectives (P)
+7. WoC (Web of Causality) - Forward causal analysis, map downstream effects (R)
+8. WAoC (Web of Anticausality) - Root cause analysis, trace upstream causes (R)
 
 ## Commands
 
@@ -110,7 +112,7 @@ dsrp-canvas/
 │   │   ├── models/           # Pydantic models
 │   │   └── services/         # Business logic
 │   ├── agents/
-│   │   ├── dsrp_agent.py     # Claude AI integration for 6 Moves
+│   │   ├── dsrp_agent.py     # Claude AI integration for 8 Moves
 │   │   └── prompts.py        # DSRP prompt templates
 │   └── requirements.txt
 │
@@ -156,5 +158,10 @@ The schema models DSRP patterns as relations:
 - `system-structure` relates `part` ↔ `whole`
 - `relationship-link` relates `action` ↔ `reaction`
 - `perspective-view` relates `point` ↔ `view`
+
+Causal analysis relations (WoC/WAoC):
+- `causal_link` relates `cause` → `effect` with strength/time_horizon
+- `web_of_causality` maps forward effects from a focal cause
+- `web_of_anticausality` traces root causes to a focal effect
 
 Concepts can play multiple roles simultaneously (Simultaneity dynamic).
