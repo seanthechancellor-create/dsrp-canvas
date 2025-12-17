@@ -67,8 +67,10 @@ async def analyze_with_dsrp(request: AnalysisRequest):
     - part-party: Break into parts and relate them (Systems)
     - rds-barbell: Relate → Distinguish → Systematize (Relationships)
     - p-circle: Map multiple perspectives (Perspectives)
+    - woc: Web of Causality - forward causal analysis (Relationships)
+    - waoc: Web of Anticausality - root cause analysis (Relationships)
     """
-    valid_moves = ["is-is-not", "zoom-in", "zoom-out", "part-party", "rds-barbell", "p-circle"]
+    valid_moves = ["is-is-not", "zoom-in", "zoom-out", "part-party", "rds-barbell", "p-circle", "woc", "waoc"]
     if request.move not in valid_moves:
         raise HTTPException(
             status_code=400, detail=f"Invalid move. Must be one of: {valid_moves}"
@@ -356,6 +358,46 @@ async def mock_analyze(request: AnalysisRequest):
             "reasoning": f"Examining '{concept}' from multiple perspectives (point/view pairs).",
             "related_concepts": ["viewpoint", "stakeholder", "lens"],
             "confidence": 0.89
+        },
+        "woc": {
+            "pattern": "R",
+            "elements": {
+                "focal_cause": concept,
+                "effects": [
+                    {"effect": f"Direct consequence of {concept}", "strength": 0.9, "time_horizon": "immediate"},
+                    {"effect": f"Secondary effect from {concept}", "strength": 0.7, "time_horizon": "short-term"},
+                    {"effect": f"Ripple effect of {concept}", "strength": 0.5, "time_horizon": "long-term"},
+                    {"effect": f"Systemic impact of {concept}", "strength": 0.4, "time_horizon": "long-term"}
+                ],
+                "causal_chains": [
+                    f"{concept} → Direct consequence → Secondary effect",
+                    f"{concept} → Ripple effect → Systemic impact"
+                ]
+            },
+            "move": "woc",
+            "reasoning": f"Mapping the Web of Causality (WoC) for '{concept}': tracing forward from cause to effects, identifying downstream consequences and ripple effects through the system.",
+            "related_concepts": ["consequence", "ripple effect", "downstream", "impact"],
+            "confidence": 0.86
+        },
+        "waoc": {
+            "pattern": "R",
+            "elements": {
+                "focal_effect": concept,
+                "root_causes": [
+                    {"cause": f"Primary driver of {concept}", "strength": 0.9, "depth": 1},
+                    {"cause": f"Underlying factor behind {concept}", "strength": 0.8, "depth": 2},
+                    {"cause": f"Systemic root of {concept}", "strength": 0.6, "depth": 3},
+                    {"cause": f"Historical origin of {concept}", "strength": 0.5, "depth": 4}
+                ],
+                "causal_chains": [
+                    f"Historical origin → Systemic root → {concept}",
+                    f"Primary driver → Underlying factor → {concept}"
+                ]
+            },
+            "move": "waoc",
+            "reasoning": f"Mapping the Web of Anticausality (WAoC) for '{concept}': tracing backward from effect to root causes, identifying upstream factors and systemic origins.",
+            "related_concepts": ["root cause", "origin", "upstream", "driver"],
+            "confidence": 0.84
         }
     }
 
@@ -389,7 +431,7 @@ async def batch_analyze(
     moves: list[str] | None = Query(default=None),
 ):
     """Analyze multiple concepts with all or specified moves."""
-    moves = moves or ["is-is-not", "zoom-in", "zoom-out", "part-party", "rds-barbell", "p-circle"]
+    moves = moves or ["is-is-not", "zoom-in", "zoom-out", "part-party", "rds-barbell", "p-circle", "woc", "waoc"]
     results = []
 
     for concept in concepts:
