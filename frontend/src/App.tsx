@@ -4,8 +4,9 @@ import { DSRPPanel } from './components/DSRPPanel'
 import { DSRPGraph } from './components/DSRPGraph'
 import { DetailsDrawer } from './components/DetailsDrawer'
 import { SplashPage } from './components/SplashPage'
+import { StudyWorkflow } from './components/StudyWorkflow'
 
-type AppView = 'splash' | 'canvas'
+type AppView = 'splash' | 'canvas' | 'study'
 
 // Error boundary
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
@@ -89,6 +90,11 @@ function AppContent() {
       setDrillDownConcept(topic)
     }
     setCurrentView('canvas')
+  }, [])
+
+  // Handle entering study workflow
+  const handleEnterStudy = useCallback(() => {
+    setCurrentView('study')
   }, [])
 
   // Add nodes and edges to the cumulative concept map
@@ -288,7 +294,12 @@ function AppContent() {
 
   // Show splash page
   if (currentView === 'splash') {
-    return <SplashPage onEnterCanvas={handleEnterCanvas} />
+    return <SplashPage onEnterCanvas={handleEnterCanvas} onEnterStudy={handleEnterStudy} />
+  }
+
+  // Show study workflow
+  if (currentView === 'study') {
+    return <StudyWorkflow onBack={() => setCurrentView('splash')} />
   }
 
   // Show canvas view

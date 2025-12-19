@@ -13,9 +13,10 @@ import { useCategoryStore } from '../stores/categoryStore'
 
 interface SplashPageProps {
   onEnterCanvas: (category?: string, topic?: string) => void
+  onEnterStudy?: () => void
 }
 
-export function SplashPage({ onEnterCanvas }: SplashPageProps) {
+export function SplashPage({ onEnterCanvas, onEnterStudy }: SplashPageProps) {
   const { categories, fetchFromBackend } = useCategoryStore()
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -78,6 +79,15 @@ export function SplashPage({ onEnterCanvas }: SplashPageProps) {
               <path d="M5 12h14M12 5l7 7-7 7"/>
             </svg>
           </button>
+          {onEnterStudy && (
+            <button className="study-mode-btn" onClick={onEnterStudy}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+              </svg>
+              Study Mode
+            </button>
+          )}
         </div>
       </header>
 
@@ -251,6 +261,27 @@ export function SplashPage({ onEnterCanvas }: SplashPageProps) {
         .enter-canvas-btn:hover {
           transform: translateY(-2px);
           box-shadow: 0 6px 25px rgba(233, 69, 96, 0.4);
+        }
+
+        .study-mode-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          padding: 12px 20px;
+          background: rgba(255, 255, 255, 0.08);
+          border: 1px solid rgba(255, 255, 255, 0.25);
+          border-radius: 8px;
+          color: white;
+          font-size: 0.9rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .study-mode-btn:hover {
+          background: rgba(255, 255, 255, 0.15);
+          border-color: rgba(255, 255, 255, 0.4);
+          transform: translateY(-2px);
         }
 
         /* Search input styles */

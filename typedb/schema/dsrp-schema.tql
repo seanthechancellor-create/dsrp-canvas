@@ -499,6 +499,76 @@ relation web_of_anticausality,
 # (Added to thing entity via plays declarations)
 
 # ============================================================================
+# STUDY SYSTEM: 5-Step Workflow
+# Tracks study sessions and their progress through the learning workflow
+# ============================================================================
+
+# Study session attributes
+attribute session_id, value string;
+attribute study_step, value string;        # gather, reflection, metacognition, fix_present, active_recall
+attribute summary_text, value string;
+attribute questions_count, value integer;
+attribute concepts_count, value integer;
+
+# Question attributes for Active Recall
+attribute question_id, value string;
+attribute question_text, value string;
+attribute answer_text, value string;
+attribute question_type, value string;     # distinction, system, relationship, perspective
+attribute difficulty, value string;        # basic, intermediate, advanced
+
+# Study session entity
+entity study_session,
+    owns session_id @key,
+    owns name,
+    owns study_step,
+    owns summary_text,
+    owns questions_count,
+    owns concepts_count,
+    owns created_at,
+    owns updated_at,
+    plays session_source:session,
+    plays session_concept:session,
+    plays session_question:session;
+
+# Study question entity
+entity study_question,
+    owns question_id @key,
+    owns question_text,
+    owns answer_text,
+    owns question_type,
+    owns difficulty,
+    owns reasoning,
+    owns created_at,
+    plays session_question:question,
+    plays question_concept:question;
+
+# Relations for study sessions
+relation session_source,
+    owns created_at,
+    relates session,
+    relates source_material;
+
+relation session_concept,
+    owns created_at,
+    relates session,
+    relates extracted;
+
+relation session_question,
+    owns created_at,
+    relates session,
+    relates question;
+
+relation question_concept,
+    owns created_at,
+    relates question,
+    relates extracted;
+
+# Allow source and concept entities to participate in study relations
+# (source already has plays extraction:source_material)
+# (concept already has plays extraction:extracted via thing)
+
+# ============================================================================
 # INITIAL DATA: The 6 Moves + 2 Causal Moves
 # These would be inserted as data, but documented here for reference:
 #
@@ -510,4 +580,13 @@ relation web_of_anticausality,
 # 6. P-Circle (P) - "What perspectives can view X?"
 # 7. WoC Analysis (R) - "If X changes, what effects ripple out?"
 # 8. WAoC Analysis (R) - "What root causes led to X?"
+# ============================================================================
+
+# ============================================================================
+# STUDY WORKFLOW: The 5 Steps
+# 1. GATHER - Collect and ingest source materials
+# 2. REFLECTION - Apply DSRP 4-8-3 analysis (using the 8 moves)
+# 3. METACOGNITION - Visualize and understand the knowledge graph
+# 4. FIX/PRESENT - Correct errors and present knowledge
+# 5. ACTIVE RECALL - Generate questions for spaced repetition
 # ============================================================================
