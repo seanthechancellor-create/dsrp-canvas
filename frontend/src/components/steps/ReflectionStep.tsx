@@ -100,6 +100,7 @@ export function ReflectionStep({ sessionId, text, sourceName, onComplete }: Refl
             <div className="depth-options">
               {(['quick', 'standard', 'deep'] as const).map((depth) => (
                 <button
+                  type="button"
                   key={depth}
                   className={`depth-btn ${analysisDepth === depth ? 'selected' : ''}`}
                   onClick={() => setAnalysisDepth(depth)}
@@ -137,7 +138,7 @@ export function ReflectionStep({ sessionId, text, sourceName, onComplete }: Refl
               </p>
             </div>
           ) : (
-            <button className="start-btn" onClick={startAnalysis}>
+            <button type="button" className="start-btn" onClick={startAnalysis}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polygon points="5 3 19 12 5 21 5 3" />
               </svg>
@@ -192,7 +193,7 @@ export function ReflectionStep({ sessionId, text, sourceName, onComplete }: Refl
             </div>
           )}
 
-          <button className="continue-btn" onClick={handleComplete}>
+          <button type="button" className="continue-btn" onClick={handleComplete}>
             Continue to Metacognition
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 18l6-6-6-6"/>

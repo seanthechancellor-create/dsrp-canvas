@@ -235,11 +235,11 @@ The 8 Moves are cognitive tools based on DSRP:
             <span>or</span>
           </div>
 
-          <button className="demo-btn" onClick={handleDemoMode}>
+          <button type="button" className="demo-btn" onClick={handleDemoMode} disabled={isProcessing}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <polygon points="5 3 19 12 5 21 5 3" />
             </svg>
-            Try Demo Mode
+            {isProcessing ? 'Loading...' : 'Try Demo Mode'}
           </button>
         </>
       ) : (
@@ -254,7 +254,7 @@ The 8 Moves are cognitive tools based on DSRP:
               <div className="file-info">
                 <span className="file-icon">{getFileIcon(file?.name || 'text')}</span>
                 <span className="file-name">{file?.name || 'Demo Content'}</span>
-                <button className="clear-btn" onClick={() => { setFile(null); setExtractedText(''); }}>
+                <button type="button" className="clear-btn" onClick={() => { setFile(null); setExtractedText(''); }}>
                   Change
                 </button>
               </div>

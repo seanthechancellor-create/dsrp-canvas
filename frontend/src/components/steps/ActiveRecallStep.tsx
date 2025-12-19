@@ -120,7 +120,7 @@ export function ActiveRecallStep({ sessionId, onComplete }: ActiveRecallStepProp
             </div>
           </div>
 
-          <button className="generate-btn" onClick={generateQuestions} disabled={isGenerating}>
+          <button type="button" className="generate-btn" onClick={generateQuestions} disabled={isGenerating}>
             {isGenerating ? (
               <>
                 <div className="btn-spinner" />
@@ -173,15 +173,15 @@ export function ActiveRecallStep({ sessionId, onComplete }: ActiveRecallStepProp
           <div className="export-section">
             <h4>Export Questions</h4>
             <div className="export-buttons">
-              <button className="export-btn" onClick={() => handleExport('remnote')}>
+              <button type="button" className="export-btn" onClick={() => handleExport('remnote')}>
                 <span className="export-icon">📝</span>
                 RemNote
               </button>
-              <button className="export-btn" onClick={() => handleExport('anki')}>
+              <button type="button" className="export-btn" onClick={() => handleExport('anki')}>
                 <span className="export-icon">🃏</span>
                 Anki
               </button>
-              <button className="export-btn" onClick={() => handleExport('markdown')}>
+              <button type="button" className="export-btn" onClick={() => handleExport('markdown')}>
                 <span className="export-icon">📄</span>
                 Markdown
               </button>
