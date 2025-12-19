@@ -256,6 +256,56 @@ async def _store_related_concepts(typedb, concept_id: str, result: dict):
                     label=perspective.get("view", "")[:100] if perspective.get("view") else None,
                 )
 
+        # Handle woc (Web of Causality): create causal relationships (forward effects)
+        elif move == "woc" and isinstance(elements.get("effects"), list):
+            for effect in elements["effects"][:10]:
+                effect_name = effect.get("effect") if isinstance(effect, dict) else str(effect)
+                if not effect_name or not isinstance(effect_name, str):
+                    continue
+                effect_concept = await typedb.get_concept_by_name(effect_name)
+                if not effect_concept:
+                    effect_id = str(uuid.uuid4())
+                    await typedb.create_concept(
+                        concept_id=effect_id,
+                        name=effect_name,
+                        description=effect.get("description") if isinstance(effect, dict) else None,
+                    )
+                else:
+                    effect_id = effect_concept["id"]
+
+                # Create relationship link for cause -> effect
+                await typedb.create_relationship_link(
+                    relationship_id=str(uuid.uuid4()),
+                    action_concept_id=concept_id,  # cause
+                    reaction_concept_id=effect_id,  # effect
+                    label=f"causes (WoC)"
+                )
+
+        # Handle waoc (Web of Anticausality): create causal relationships (root causes)
+        elif move == "waoc" and isinstance(elements.get("causes"), list):
+            for cause in elements["causes"][:10]:
+                cause_name = cause.get("cause") if isinstance(cause, dict) else str(cause)
+                if not cause_name or not isinstance(cause_name, str):
+                    continue
+                cause_concept = await typedb.get_concept_by_name(cause_name)
+                if not cause_concept:
+                    cause_id = str(uuid.uuid4())
+                    await typedb.create_concept(
+                        concept_id=cause_id,
+                        name=cause_name,
+                        description=cause.get("description") if isinstance(cause, dict) else None,
+                    )
+                else:
+                    cause_id = cause_concept["id"]
+
+                # Create relationship link for cause -> effect (concept is the effect)
+                await typedb.create_relationship_link(
+                    relationship_id=str(uuid.uuid4()),
+                    action_concept_id=cause_id,  # root cause
+                    reaction_concept_id=concept_id,  # effect (current concept)
+                    label=f"caused by (WAoC)"
+                )
+
     except Exception as e:
         logger.warning(f"Failed to store related concepts: {e}")
 

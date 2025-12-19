@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useEffect } from 'react'
 import { DSRP_COLORS, DSRP_NAMES, DSRPIcon, DSRPPattern } from './DSRPIcons'
+import { QuizPanel } from './QuizPanel'
 
 interface AnalysisResult {
   pattern: string
@@ -23,11 +24,13 @@ interface DetailsDrawerProps {
   concept: string
   result: AnalysisResult | null
   onDrillDown?: (concept: string) => void
+  selectedDomain?: string | null
+  selectedTopic?: string | null
 }
 
-type TabId = 'elements' | 'relationships' | 'metadata' | 'source'
+type TabId = 'elements' | 'relationships' | 'notes' | 'quiz' | 'metadata'
 
-export function DetailsDrawer({ isOpen, onClose, concept, result, onDrillDown }: DetailsDrawerProps) {
+export function DetailsDrawer({ isOpen, onClose, concept, result, onDrillDown, selectedDomain, selectedTopic }: DetailsDrawerProps) {
   const [activeTab, setActiveTab] = useState<TabId>('elements')
   const [drawerHeight, setDrawerHeight] = useState(320)
   const [isResizing, setIsResizing] = useState(false)
@@ -92,6 +95,24 @@ export function DetailsDrawer({ isOpen, onClose, concept, result, onDrillDown }:
         rightValue: typeof p === 'object' ? p.view : '',
         dynamic: 'simultaneity'
       }))
+    } else if (move === 'woc') {
+      const effects = Array.isArray(elements.effects) ? elements.effects : []
+      return effects.map((e: any) => ({
+        left: 'cause',
+        right: 'effect',
+        leftValue: elements.cause || concept,
+        rightValue: typeof e === 'string' ? e : e.effect,
+        dynamic: 'causality'
+      }))
+    } else if (move === 'waoc') {
+      const causes = Array.isArray(elements.causes) ? elements.causes : []
+      return causes.map((c: any) => ({
+        left: 'cause',
+        right: 'effect',
+        leftValue: typeof c === 'string' ? c : c.cause,
+        rightValue: elements.effect || concept,
+        dynamic: 'causality'
+      }))
     }
     return []
   }
@@ -112,9 +133,93 @@ export function DetailsDrawer({ isOpen, onClose, concept, result, onDrillDown }:
       })
     } else if (result.move === 'zoom-out' && elements.whole) {
       relations.push({ from: String(elements.whole), to: concept, type: 'contains' })
+    } else if (result.move === 'woc' && Array.isArray(elements.effects)) {
+      elements.effects.forEach((e: any) => {
+        const effectName = typeof e === 'string' ? e : e.effect
+        relations.push({ from: concept, to: effectName, type: 'causes →' })
+      })
+    } else if (result.move === 'waoc' && Array.isArray(elements.causes)) {
+      elements.causes.forEach((c: any) => {
+        const causeName = typeof c === 'string' ? c : c.cause
+        relations.push({ from: causeName, to: concept, type: '→ leads to' })
+      })
     }
 
     return relations
+  }
+
+  // Generate RemNote-style DSRP notes
+  const getDSRPNotes = () => {
+    if (!result) return []
+    const notes: Array<{ type: string; content: string; children?: string[] }> = []
+    const elements = result.elements
+    const move = result.move
+
+    // Main concept note
+    notes.push({
+      type: 'concept',
+      content: `📌 ${concept}`,
+      children: [`Pattern: ${patternName} (${result.pattern})`, `Move: ${move}`]
+    })
+
+    // Pattern-specific notes
+    if (move === 'is-is-not') {
+      notes.push({
+        type: 'distinction',
+        content: '◐ Distinction',
+        children: [
+          `✓ IS: ${String(elements.identity || '').slice(0, 150)}`,
+          `✗ IS NOT: ${String(elements.other || '').slice(0, 150)}`
+        ]
+      })
+    } else if (move === 'zoom-in' || move === 'part-party') {
+      const parts = Array.isArray(elements.parts) ? elements.parts : []
+      notes.push({
+        type: 'system',
+        content: '⚙️ System Parts',
+        children: parts.map((p: string) => `• ${p}`)
+      })
+    } else if (move === 'zoom-out') {
+      notes.push({
+        type: 'system',
+        content: '🔭 Context',
+        children: [`Whole: ${String(elements.whole || '')}`, `Part: ${concept}`]
+      })
+    } else if (move === 'p-circle') {
+      const perspectives = Array.isArray(elements.perspectives) ? elements.perspectives : []
+      notes.push({
+        type: 'perspectives',
+        content: '👁 Perspectives',
+        children: perspectives.map((p: any) =>
+          `${typeof p === 'string' ? p : p.point}: ${typeof p === 'object' ? p.view : ''}`
+        )
+      })
+    } else if (move === 'woc') {
+      const effects = Array.isArray(elements.effects) ? elements.effects : []
+      notes.push({
+        type: 'causality',
+        content: '→ Effects (WoC)',
+        children: effects.map((e: any) => `→ ${typeof e === 'string' ? e : e.effect}`)
+      })
+    } else if (move === 'waoc') {
+      const causes = Array.isArray(elements.causes) ? elements.causes : []
+      notes.push({
+        type: 'causality',
+        content: '← Root Causes (WAoC)',
+        children: causes.map((c: any) => `← ${typeof c === 'string' ? c : c.cause}`)
+      })
+    }
+
+    // Reasoning note
+    if (result.reasoning) {
+      notes.push({
+        type: 'reasoning',
+        content: '💡 Reasoning',
+        children: [result.reasoning]
+      })
+    }
+
+    return notes
   }
 
   const handleDrillDown = (value: string) => {
@@ -156,13 +261,13 @@ export function DetailsDrawer({ isOpen, onClose, concept, result, onDrillDown }:
 
       {/* Tab navigation */}
       <div className="tab-nav">
-        {(['elements', 'relationships', 'metadata', 'source'] as TabId[]).map(tab => (
+        {(['elements', 'relationships', 'notes', 'quiz', 'metadata'] as TabId[]).map(tab => (
           <button
             key={tab}
             className={`tab-btn ${activeTab === tab ? 'active' : ''}`}
             onClick={() => setActiveTab(tab)}
           >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {tab === 'notes' ? '📝 Notes' : tab === 'quiz' ? '🧠 Quiz' : tab.charAt(0).toUpperCase() + tab.slice(1)}
           </button>
         ))}
       </div>
@@ -262,12 +367,44 @@ export function DetailsDrawer({ isOpen, onClose, concept, result, onDrillDown }:
           </div>
         )}
 
-        {activeTab === 'source' && (
-          <div className="source-tab">
-            <div className="reasoning-section">
-              <h4>AI Reasoning</h4>
-              <p className="reasoning-text">{result?.reasoning || 'No reasoning provided'}</p>
+        {activeTab === 'notes' && (
+          <div className="notes-tab">
+            <div className="notes-header">
+              <span className="notes-title">DSRP Analysis Notes</span>
+              <button
+                className="copy-notes-btn"
+                onClick={() => {
+                  const notes = getDSRPNotes()
+                  const markdown = notes.map(n =>
+                    `## ${n.content}\n${n.children?.map(c => `- ${c}`).join('\n') || ''}`
+                  ).join('\n\n')
+                  navigator.clipboard.writeText(markdown)
+                }}
+                title="Copy as Markdown"
+              >
+                📋 Copy
+              </button>
             </div>
+            <div className="notes-list">
+              {getDSRPNotes().map((note, idx) => (
+                <div key={idx} className={`note-block note-${note.type}`}>
+                  <div className="note-header">{note.content}</div>
+                  {note.children && (
+                    <ul className="note-children">
+                      {note.children.map((child, cidx) => (
+                        <li key={cidx} className="note-child">{child}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'quiz' && (
+          <div className="quiz-tab">
+            <QuizPanel domain={selectedDomain} topic={selectedTopic} />
           </div>
         )}
       </div>
@@ -356,28 +493,54 @@ export function DetailsDrawer({ isOpen, onClose, concept, result, onDrillDown }:
 
         .tab-nav {
           display: flex;
-          gap: 4px;
-          padding: 8px 20px;
+          gap: 8px;
+          padding: 12px 20px;
+          background: rgba(0,0,0,0.2);
           border-bottom: 1px solid rgba(255,255,255,0.1);
         }
         .tab-btn {
-          padding: 8px 16px;
-          background: transparent;
-          border: none;
-          color: rgba(255,255,255,0.5);
+          padding: 10px 18px;
+          background: rgba(255,255,255,0.05);
+          border: 1px solid rgba(255,255,255,0.1);
+          color: rgba(255,255,255,0.6);
           font-size: 13px;
-          font-weight: 500;
+          font-weight: 600;
           cursor: pointer;
-          border-radius: 6px;
-          transition: all 0.15s;
+          border-radius: 12px 12px 4px 4px;
+          transition: all 0.2s ease;
+          position: relative;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        .tab-btn::before {
+          content: '';
+          position: absolute;
+          bottom: 0;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 0;
+          height: 2px;
+          background: #e94560;
+          transition: width 0.2s ease;
         }
         .tab-btn:hover {
-          background: rgba(255,255,255,0.05);
-          color: rgba(255,255,255,0.8);
+          background: rgba(255,255,255,0.1);
+          color: rgba(255,255,255,0.9);
+          border-color: rgba(255,255,255,0.2);
+          transform: translateY(-2px);
+        }
+        .tab-btn:hover::before {
+          width: 60%;
         }
         .tab-btn.active {
-          background: #e94560;
+          background: linear-gradient(135deg, #e94560 0%, #c73e54 100%);
           color: white;
+          border-color: #e94560;
+          box-shadow: 0 4px 12px rgba(233, 69, 96, 0.3);
+        }
+        .tab-btn.active::before {
+          width: 80%;
+          background: white;
         }
 
         .tab-content {
@@ -554,6 +717,82 @@ export function DetailsDrawer({ isOpen, onClose, concept, result, onDrillDown }:
           font-size: 14px;
           text-align: center;
           padding: 20px;
+        }
+
+        /* Notes Tab - RemNote style */
+        .notes-tab {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .notes-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 8px;
+        }
+        .notes-title {
+          font-size: 14px;
+          font-weight: 600;
+          color: rgba(255,255,255,0.7);
+        }
+        .copy-notes-btn {
+          padding: 6px 12px;
+          background: rgba(255,255,255,0.1);
+          border: none;
+          border-radius: 4px;
+          color: rgba(255,255,255,0.7);
+          font-size: 12px;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .copy-notes-btn:hover {
+          background: #e94560;
+          color: white;
+        }
+        .notes-list {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .note-block {
+          background: rgba(255,255,255,0.03);
+          border-left: 3px solid;
+          border-radius: 0 6px 6px 0;
+          padding: 12px 16px;
+        }
+        .note-concept { border-color: #e94560; }
+        .note-distinction { border-color: #1976D2; }
+        .note-system { border-color: #388E3C; }
+        .note-perspectives { border-color: #7B1FA2; }
+        .note-causality { border-color: #F57C00; }
+        .note-reasoning { border-color: #666; }
+        .note-header {
+          font-size: 14px;
+          font-weight: 600;
+          color: #fff;
+          margin-bottom: 8px;
+        }
+        .note-children {
+          list-style: none;
+          padding: 0;
+          margin: 0;
+        }
+        .note-child {
+          font-size: 13px;
+          color: rgba(255,255,255,0.75);
+          padding: 4px 0 4px 12px;
+          border-left: 1px solid rgba(255,255,255,0.1);
+          margin-left: 4px;
+          line-height: 1.5;
+        }
+        .note-child:hover {
+          background: rgba(255,255,255,0.03);
+        }
+
+        /* Quiz Tab */
+        .quiz-tab {
+          padding: 4px 0;
         }
 
         /* Mobile styles */

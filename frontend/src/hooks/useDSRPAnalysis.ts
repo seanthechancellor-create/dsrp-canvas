@@ -13,14 +13,15 @@ interface DSRPResult {
 // Use relative URL to go through Vite proxy, fallback to direct backend URL
 const API_URL = import.meta.env.VITE_API_URL || ''
 
-// Default to mock mode from environment (set VITE_USE_MOCK=false to disable)
-const DEFAULT_USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
+// Default to REAL AI mode (mock only if explicitly set VITE_USE_MOCK=true)
+const DEFAULT_USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
 export function useDSRPAnalysis() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [result, setResult] = useState<DSRPResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [useMock, setUseMock] = useState(DEFAULT_USE_MOCK)
+  const [aiProvider, setAiProvider] = useState<string | null>(null)
 
   const analyze = async (concept: string, move: string) => {
     setIsAnalyzing(true)
@@ -39,6 +40,10 @@ export function useDSRPAnalysis() {
       })
       console.log('[DSRP] Response:', response.data)
       setResult(response.data)
+      // Capture which AI provider was used
+      if (response.data?.provider) {
+        setAiProvider(response.data.provider)
+      }
     } catch (err: any) {
       console.error('[DSRP] Error:', err)
       // If real API fails with auth error, suggest mock mode
@@ -63,5 +68,5 @@ export function useDSRPAnalysis() {
     setUseMock(prev => !prev)
   }
 
-  return { analyze, isAnalyzing, result, error, clear, useMock, toggleMock }
+  return { analyze, isAnalyzing, result, error, clear, useMock, toggleMock, aiProvider }
 }

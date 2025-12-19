@@ -2,7 +2,8 @@
 Vector Search Service using pgvector
 
 Provides semantic search capabilities for DSRP concepts and analyses.
-Uses OpenAI embeddings stored in PostgreSQL with pgvector extension.
+Uses embeddings stored in PostgreSQL with pgvector extension.
+Supports multiple embedding providers: Ollama (default), OpenAI.
 
 Setup:
     1. Install PostgreSQL with pgvector extension
@@ -14,13 +15,23 @@ import os
 import logging
 from typing import Optional
 import hashlib
+import httpx
 
 logger = logging.getLogger(__name__)
 
 # Configuration
 POSTGRES_URL = os.getenv("POSTGRES_URL", "postgresql://localhost:5432/dsrp_canvas")
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
-EMBEDDING_DIMENSIONS = 1536  # OpenAI text-embedding-3-small
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "nomic-embed-text")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# Embedding dimensions by provider
+OLLAMA_EMBEDDING_DIMENSIONS = 768  # nomic-embed-text
+OPENAI_EMBEDDING_DIMENSIONS = 1536  # text-embedding-3-small
+
+# Use OpenAI if API key is set, otherwise use Ollama
+USE_OPENAI = bool(OPENAI_API_KEY)
+EMBEDDING_DIMENSIONS = OPENAI_EMBEDDING_DIMENSIONS if USE_OPENAI else OLLAMA_EMBEDDING_DIMENSIONS
 
 # Lazy imports to avoid startup failures
 _pool = None
@@ -42,16 +53,34 @@ def _get_pool():
 
 
 def _get_openai():
-    """Get or create OpenAI client."""
+    """Get or create OpenAI client (only if API key is set)."""
     global _openai_client
+    if not USE_OPENAI:
+        return None
     if _openai_client is None:
         try:
             from openai import OpenAI
-            _openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+            _openai_client = OpenAI(api_key=OPENAI_API_KEY)
         except Exception as e:
             logger.warning(f"Failed to create OpenAI client: {e}")
             _openai_client = None
     return _openai_client
+
+
+async def _get_ollama_embedding(text: str) -> Optional[list[float]]:
+    """Get embedding from Ollama."""
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                f"{OLLAMA_BASE_URL}/api/embeddings",
+                json={"model": EMBEDDING_MODEL, "prompt": text}
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data.get("embedding")
+    except Exception as e:
+        logger.error(f"Failed to get Ollama embedding: {e}")
+        return None
 
 
 class VectorService:
@@ -115,6 +144,22 @@ class VectorService:
                         );
                     """)
 
+                    # Create embeddings table for document chunks (RAG pipeline)
+                    cur.execute(f"""
+                        CREATE TABLE IF NOT EXISTS document_embeddings (
+                            id SERIAL PRIMARY KEY,
+                            document_id VARCHAR(255) NOT NULL,
+                            chunk_id VARCHAR(255) UNIQUE NOT NULL,
+                            chunk_index INTEGER NOT NULL,
+                            filename VARCHAR(500),
+                            content TEXT NOT NULL,
+                            content_hash VARCHAR(64) NOT NULL,
+                            embedding vector({EMBEDDING_DIMENSIONS}),
+                            metadata JSONB DEFAULT '{{}}',
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        );
+                    """)
+
                     # Create indexes for similarity search
                     cur.execute("""
                         CREATE INDEX IF NOT EXISTS concept_embedding_idx
@@ -137,6 +182,18 @@ class VectorService:
                         WITH (lists = 100);
                     """)
 
+                    cur.execute("""
+                        CREATE INDEX IF NOT EXISTS document_embedding_idx
+                        ON document_embeddings
+                        USING ivfflat (embedding vector_cosine_ops)
+                        WITH (lists = 100);
+                    """)
+
+                    cur.execute("""
+                        CREATE INDEX IF NOT EXISTS document_embedding_doc_idx
+                        ON document_embeddings (document_id);
+                    """)
+
                     conn.commit()
                     self._initialized = True
                     logger.info("Vector store initialized successfully")
@@ -151,21 +208,25 @@ class VectorService:
         return hashlib.sha256(content.encode()).hexdigest()
 
     async def _get_embedding(self, text: str) -> Optional[list[float]]:
-        """Get embedding vector for text using OpenAI."""
-        client = _get_openai()
-        if not client:
-            logger.warning("OpenAI client not available for embeddings")
-            return None
+        """Get embedding vector for text using configured provider (Ollama or OpenAI)."""
+        if USE_OPENAI:
+            client = _get_openai()
+            if not client:
+                logger.warning("OpenAI client not available, falling back to Ollama")
+                return await _get_ollama_embedding(text)
 
-        try:
-            response = client.embeddings.create(
-                model=EMBEDDING_MODEL,
-                input=text,
-            )
-            return response.data[0].embedding
-        except Exception as e:
-            logger.error(f"Failed to get embedding: {e}")
-            return None
+            try:
+                response = client.embeddings.create(
+                    model="text-embedding-3-small",
+                    input=text,
+                )
+                return response.data[0].embedding
+            except Exception as e:
+                logger.error(f"Failed to get OpenAI embedding: {e}")
+                return None
+        else:
+            # Use Ollama for embeddings
+            return await _get_ollama_embedding(text)
 
     # =========================================================================
     # Concept Embeddings
@@ -528,6 +589,151 @@ class VectorService:
                     return results
         except Exception as e:
             logger.error(f"Failed to search sources: {e}")
+            return []
+
+    # =========================================================================
+    # Document Embeddings (RAG Pipeline)
+    # =========================================================================
+
+    async def embed_document_chunk(
+        self,
+        document_id: str,
+        chunk_id: str,
+        chunk_index: int,
+        content: str,
+        filename: Optional[str] = None,
+        metadata: Optional[dict] = None,
+    ) -> bool:
+        """
+        Embed a document chunk for RAG retrieval.
+
+        Args:
+            document_id: ID of the parent document
+            chunk_id: Unique ID for this chunk
+            chunk_index: Position in document
+            content: Text content to embed
+            filename: Optional source filename
+            metadata: Optional metadata dict
+        """
+        pool = _get_pool()
+        if not pool:
+            return False
+
+        content_hash = self._compute_hash(content)
+
+        # Check if already embedded with same content
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT content_hash FROM document_embeddings WHERE chunk_id = %s",
+                        (chunk_id,)
+                    )
+                    row = cur.fetchone()
+                    if row and row[0] == content_hash:
+                        return True  # Already embedded
+        except Exception:
+            pass
+
+        embedding = await self._get_embedding(content)
+        if not embedding:
+            return False
+
+        try:
+            import json
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO document_embeddings
+                            (document_id, chunk_id, chunk_index, filename, content, content_hash, embedding, metadata)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (chunk_id) DO UPDATE SET
+                            content = EXCLUDED.content,
+                            content_hash = EXCLUDED.content_hash,
+                            embedding = EXCLUDED.embedding,
+                            metadata = EXCLUDED.metadata;
+                    """, (document_id, chunk_id, chunk_index, filename, content, content_hash, embedding, json.dumps(metadata or {})))
+                    conn.commit()
+                    return True
+        except Exception as e:
+            logger.error(f"Failed to embed document chunk: {e}")
+            return False
+
+    async def search_documents(
+        self,
+        query: str,
+        document_ids: Optional[list[str]] = None,
+        limit: int = 10,
+        threshold: float = 0.5,
+    ) -> list[dict]:
+        """
+        Search document chunks by semantic similarity.
+
+        This is the primary RAG retrieval method for the study guide ingestor.
+
+        Args:
+            query: Search query text
+            document_ids: Optional filter by document IDs
+            limit: Maximum results
+            threshold: Minimum similarity score
+        """
+        pool = _get_pool()
+        if not pool:
+            return []
+
+        query_embedding = await self._get_embedding(query)
+        if not query_embedding:
+            return []
+
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    if document_ids:
+                        cur.execute("""
+                            SELECT
+                                document_id,
+                                chunk_id,
+                                chunk_index,
+                                filename,
+                                content,
+                                metadata,
+                                1 - (embedding <=> %s::vector) as similarity
+                            FROM document_embeddings
+                            WHERE document_id = ANY(%s)
+                              AND 1 - (embedding <=> %s::vector) >= %s
+                            ORDER BY similarity DESC
+                            LIMIT %s;
+                        """, (query_embedding, document_ids, query_embedding, threshold, limit))
+                    else:
+                        cur.execute("""
+                            SELECT
+                                document_id,
+                                chunk_id,
+                                chunk_index,
+                                filename,
+                                content,
+                                metadata,
+                                1 - (embedding <=> %s::vector) as similarity
+                            FROM document_embeddings
+                            WHERE 1 - (embedding <=> %s::vector) >= %s
+                            ORDER BY similarity DESC
+                            LIMIT %s;
+                        """, (query_embedding, query_embedding, threshold, limit))
+
+                    results = []
+                    for row in cur.fetchall():
+                        results.append({
+                            "document_id": row[0],
+                            "chunk_id": row[1],
+                            "chunk_index": row[2],
+                            "filename": row[3],
+                            "content": row[4],
+                            "metadata": row[5] or {},
+                            "similarity": float(row[6]),
+                        })
+                    return results
+        except Exception as e:
+            logger.error(f"Failed to search documents: {e}")
             return []
 
     # =========================================================================

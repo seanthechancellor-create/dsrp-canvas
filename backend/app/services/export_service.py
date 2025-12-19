@@ -143,8 +143,9 @@ async def export_to_remnote(
     include_analyses: bool = True,
 ) -> list[dict[str, Any]]:
     """
-    Export to RemNote flashcard format.
-    Creates spaced repetition cards from DSRP analyses.
+    Export to RemNote flashcard format using Concept Descriptor framework.
+    Creates spaced repetition cards from DSRP 4-8-3 analyses.
+    Uses :: notation for automatic flashcard creation in RemNote.
     """
     cards = []
     typedb = get_typedb_service()
@@ -169,57 +170,153 @@ async def export_to_remnote(
         name = concept.get("name", "Unnamed")
 
         for analysis in analyses:
-            # Create cards based on the move type
+            # Create cards based on the move type using DSRP 4-8-3
             move = analysis.get("move", "")
+            elements = analysis.get("elements", {})
+            pattern = analysis.get("pattern", "")
+            reasoning = analysis.get("reasoning", "")
 
+            # D - Distinctions (identity/other)
             if move == "is-is-not":
+                identity = elements.get("identity", "")
+                other = elements.get("other", "")
                 cards.append({
-                    "front": f"What IS {name}?",
-                    "back": analysis.get("elements", {}).get("identity", ""),
-                    "tags": ["dsrp", "distinctions", name],
+                    "remnote_format": f"{name}\n  Pattern:: D (Distinction)\n  Identity:: {identity}\n  Other:: {other}\n  Boundary:: {elements.get('boundary', '')}\n  #DSRP #Distinction",
+                    "front": f"[D] What IS {name}? (Identity)",
+                    "back": identity,
+                    "tags": ["DSRP", "D-Distinction", "identity", name],
                 })
                 cards.append({
-                    "front": f"What is {name} NOT?",
-                    "back": analysis.get("elements", {}).get("other", ""),
-                    "tags": ["dsrp", "distinctions", name],
+                    "remnote_format": f"What is {name} NOT?\n  Answer:: {other}\n  #DSRP #Distinction",
+                    "front": f"[D] What is {name} NOT? (Other)",
+                    "back": other,
+                    "tags": ["DSRP", "D-Distinction", "other", name],
                 })
 
+            # S - Systems (part/whole)
             elif move == "zoom-in":
+                parts = elements.get("parts", [])
+                parts_str = ", ".join(parts) if isinstance(parts, list) else str(parts)
                 cards.append({
-                    "front": f"What are the parts of {name}?",
-                    "back": analysis.get("elements", {}).get("parts", ""),
-                    "tags": ["dsrp", "systems", name],
+                    "remnote_format": f"{name} (Parts)\n  Pattern:: S (System)\n  Parts:: {parts_str}\n  #DSRP #System #ZoomIn",
+                    "front": f"[S] What are the parts of {name}? (Zoom In)",
+                    "back": parts_str,
+                    "tags": ["DSRP", "S-System", "parts", "zoom-in", name],
                 })
 
             elif move == "zoom-out":
+                whole = elements.get("whole", "")
                 cards.append({
-                    "front": f"What larger system does {name} belong to?",
-                    "back": analysis.get("elements", {}).get("whole", ""),
-                    "tags": ["dsrp", "systems", name],
+                    "remnote_format": f"{name} (Context)\n  Pattern:: S (System)\n  Part of:: {whole}\n  #DSRP #System #ZoomOut",
+                    "front": f"[S] What larger system/whole contains {name}? (Zoom Out)",
+                    "back": whole,
+                    "tags": ["DSRP", "S-System", "whole", "zoom-out", name],
                 })
 
             elif move == "part-party":
+                parts = elements.get("parts", [])
+                parts_str = ", ".join(parts) if isinstance(parts, list) else str(parts)
                 cards.append({
-                    "front": f"How do the parts of {name} relate to each other?",
-                    "back": analysis.get("reasoning", ""),
-                    "tags": ["dsrp", "systems", name],
+                    "remnote_format": f"{name} (Part-Party)\n  Pattern:: S (System)\n  Parts:: {parts_str}\n  Part Relations:: {reasoning}\n  #DSRP #System #PartParty",
+                    "front": f"[S] How do the parts of {name} relate to each other? (Part-Party)",
+                    "back": reasoning,
+                    "tags": ["DSRP", "S-System", "part-party", name],
                 })
 
+            # R - Relationships (action/reaction)
             elif move == "rds-barbell":
+                reactions = elements.get("reactions", [])
+                reactions_str = ", ".join(reactions) if isinstance(reactions, list) else str(reactions)
                 cards.append({
-                    "front": f"What relationships does {name} have?",
-                    "back": analysis.get("elements", {}).get("relationships", ""),
-                    "tags": ["dsrp", "relationships", name],
+                    "remnote_format": f"{name} (Relationships)\n  Pattern:: R (Relationship)\n  Action:: {name}\n  Reactions:: {reactions_str}\n  #DSRP #Relationship #RDSBarbell",
+                    "front": f"[R] What are the relationships/reactions of {name}? (RDS Barbell)",
+                    "back": reactions_str,
+                    "tags": ["DSRP", "R-Relationship", "rds-barbell", name],
                 })
 
-            elif move == "p-circle":
+            # R - Web of Causality (forward effects)
+            elif move == "woc":
+                effects = elements.get("effects", [])
+                effects_list = []
+                for eff in effects if isinstance(effects, list) else []:
+                    if isinstance(eff, dict):
+                        effects_list.append(f"{eff.get('effect', '')} (Level {eff.get('level', 1)})")
+                    else:
+                        effects_list.append(str(eff))
+                effects_str = ", ".join(effects_list) if effects_list else str(effects)
                 cards.append({
-                    "front": f"What are different perspectives on {name}?",
-                    "back": analysis.get("elements", {}).get("perspectives", ""),
-                    "tags": ["dsrp", "perspectives", name],
+                    "remnote_format": f"{name} (Web of Causality)\n  Pattern:: R (Relationship)\n  Cause:: {name}\n  Effects:: {effects_str}\n  #DSRP #Relationship #WoC #Causality",
+                    "front": f"[R] What effects does {name} cause? (Web of Causality)",
+                    "back": effects_str,
+                    "tags": ["DSRP", "R-Relationship", "woc", "causality", name],
+                })
+
+            # R - Web of Anticausality (root causes)
+            elif move == "waoc":
+                causes = elements.get("causes", [])
+                causes_list = []
+                for c in causes if isinstance(causes, list) else []:
+                    if isinstance(c, dict):
+                        causes_list.append(f"{c.get('cause', '')} (Level {c.get('level', 1)})")
+                    else:
+                        causes_list.append(str(c))
+                causes_str = ", ".join(causes_list) if causes_list else str(causes)
+                cards.append({
+                    "remnote_format": f"{name} (Root Causes)\n  Pattern:: R (Relationship)\n  Effect:: {name}\n  Root Causes:: {causes_str}\n  #DSRP #Relationship #WAoC #RootCause",
+                    "front": f"[R] What are the root causes of {name}? (Web of Anticausality)",
+                    "back": causes_str,
+                    "tags": ["DSRP", "R-Relationship", "waoc", "root-cause", name],
+                })
+
+            # P - Perspectives (point/view)
+            elif move == "p-circle":
+                perspectives = elements.get("perspectives", [])
+                persp_list = []
+                for p in perspectives if isinstance(perspectives, list) else []:
+                    if isinstance(p, dict):
+                        persp_list.append(f"{p.get('point', '')}: {p.get('view', '')}")
+                    else:
+                        persp_list.append(str(p))
+                persp_str = "; ".join(persp_list) if persp_list else str(perspectives)
+                cards.append({
+                    "remnote_format": f"{name} (Perspectives)\n  Pattern:: P (Perspective)\n  Perspectives:: {persp_str}\n  #DSRP #Perspective #PCircle",
+                    "front": f"[P] What are different perspectives on {name}? (P-Circle)",
+                    "back": persp_str,
+                    "tags": ["DSRP", "P-Perspective", "p-circle", name],
                 })
 
     return cards
+
+
+async def export_to_remnote_markdown(
+    concept_ids: list[str],
+    include_analyses: bool = True,
+) -> str:
+    """
+    Export to RemNote-compatible Markdown with :: notation for SRS.
+    This can be directly imported into RemNote for spaced repetition study.
+    Uses DSRP 4-8-3 Concept Descriptor framework.
+    """
+    cards = await export_to_remnote(concept_ids, include_analyses)
+
+    lines = [
+        "# DSRP 4-8-3 Knowledge Export",
+        "## For RemNote Spaced Repetition Study",
+        "",
+        "**4 Patterns**: D (Distinctions), S (Systems), R (Relationships), P (Perspectives)",
+        "**8 Elements**: identity/other, part/whole, action/reaction, point/view",
+        "**3 Dynamics**: Equality (=), Co-implication (⇔), Simultaneity (✷)",
+        "",
+        "---",
+        ""
+    ]
+
+    for card in cards:
+        if card.get("remnote_format"):
+            lines.append(card["remnote_format"])
+            lines.append("")
+
+    return "\n".join(lines)
 
 
 def format_analysis_markdown(analysis: dict) -> str:

@@ -196,6 +196,7 @@ class TypeDBService:
 
     async def list_sources(self, limit: int = 50) -> list[dict]:
         """List all sources."""
+        # TypeDB 3.x: limit comes before fetch
         query = f"""
             match
             $s isa source,
@@ -203,13 +204,14 @@ class TypeDBService:
                has source_type $type,
                has original_filename $filename,
                has created_at $created;
+            sort $created desc;
+            limit {limit};
             fetch {{
                 "id": $id,
                 "source_type": $type,
                 "original_filename": $filename,
                 "created_at": $created
             }};
-            limit {limit};
         """
 
         sources = []
@@ -327,6 +329,7 @@ class TypeDBService:
 
     async def list_concepts(self, limit: int = 50, offset: int = 0) -> list[dict]:
         """List all concepts with pagination."""
+        # TypeDB 3.x: offset/limit come before fetch
         query = f"""
             match
             $c isa dsrp_concept,
@@ -334,14 +337,15 @@ class TypeDBService:
                has name $name,
                has created_at $created,
                has updated_at $updated;
+            sort $created desc;
+            offset {offset};
+            limit {limit};
             fetch {{
                 "id": $id,
                 "name": $name,
                 "created_at": $created,
                 "updated_at": $updated
             }};
-            offset {offset};
-            limit {limit};
         """
 
         concepts = []
@@ -736,16 +740,17 @@ class TypeDBService:
         edges = []
 
         # Get all concepts with their IDs and names
+        # TypeDB 3.x: limit comes before fetch
         concept_query = f"""
             match
             $c isa dsrp_concept,
                has concept_id $id,
                has name $name;
+            limit {limit};
             fetch {{
                 "id": $id,
                 "name": $name
             }};
-            limit {limit};
         """
 
         concept_ids = set()

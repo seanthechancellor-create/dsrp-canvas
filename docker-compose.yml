@@ -45,7 +45,31 @@ services:
       timeout: 5s
       retries: 5
 
-  # MongoDB for Vector Search (Episodic Memory)
+  # Ollama for Local LLM and Embeddings
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    # Uncomment for GPU support (requires nvidia-container-toolkit)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  # MongoDB for Document Storage (Episodic Memory)
   mongodb:
     image: mongo:7
     ports:
@@ -79,6 +103,8 @@ services:
       - POSTGRES_URL=postgresql://dsrp:dsrp_password@postgres:5432/dsrp_canvas
       - REDIS_URL=redis://redis:6379/0
       - MONGODB_URL=mongodb://mongodb:27017/dsrp_knowledge
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3}
     volumes:
       - ./backend:/app
       - ./uploads:/app/uploads
@@ -92,6 +118,8 @@ services:
         condition: service_healthy
       mongodb:
         condition: service_healthy
+      ollama:
+        condition: service_started  # Don't wait for Ollama health - it's optional
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   # MCP Server (for Claude Desktop integration)
@@ -134,6 +162,7 @@ services:
   # DSRP Knowledge Ingestion Pipeline
   # Processes documents, extracts DSRP patterns, stores in MongoDB + TypeDB
   # Usage: docker-compose run pipeline python ingest.py
+  # Usage: docker-compose run pipeline python study_guide_ingestor.py <pdf_path>
   pipeline:
     build:
       context: ./pipeline
@@ -150,6 +179,10 @@ services:
       - TYPEDB_USERNAME=admin
       - TYPEDB_PASSWORD=password
       - MONGODB_URL=mongodb://mongodb:27017/dsrp_knowledge
+      - POSTGRES_URL=postgresql://dsrp:dsrp_password@postgres:5432/dsrp_canvas
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-nomic-embed-text}
     volumes:
       - ./pipeline:/app
       - ./documents:/app/documents
@@ -158,6 +191,10 @@ services:
         condition: service_healthy
       mongodb:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started  # Don't wait for Ollama health - it's optional
     # By default, just keep container available for manual runs
     # Use: docker-compose run pipeline python ingest.py
     command: ["tail", "-f", "/dev/null"]
@@ -169,3 +206,4 @@ volumes:
   postgres_data:
   redis_data:
   mongodb_data:
+  ollama_data:

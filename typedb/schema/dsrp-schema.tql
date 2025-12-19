@@ -76,6 +76,13 @@ attribute canvas_y, value double;
 attribute canvas_scale, value double;
 attribute color, value string;
 
+# Multi-domain knowledge organization
+attribute domain, value string;         # Certification/area: "CIPP/E", "CIPP/US", "CIPM", "AI Act"
+attribute topic, value string;          # Topic within domain: "Legal Bases", "Data Subject Rights"
+attribute chapter, value string;        # Book/course structure: "Chapter 3", "Module 2"
+attribute source_document, value string; # Source material: "CIPP-E-Study-Guide.pdf"
+attribute knowledge_structure, value string;  # Francis Miller structure type: "hierarchy", "sequence", "compare-contrast"
+
 # ============================================================================
 # CORE ENTITY: THING (Abstract Base)
 # Everything that can be cognized is a "thing"
@@ -131,6 +138,11 @@ entity thing @abstract,
 entity concept sub thing,
     owns confidence,
     owns reasoning,
+    owns domain,
+    owns topic,
+    owns chapter,
+    owns source_document,
+    owns knowledge_structure,
     plays concept_link:source_concept,
     plays concept_link:target_concept;
 

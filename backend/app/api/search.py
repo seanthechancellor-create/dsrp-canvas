@@ -14,6 +14,24 @@ from app.services.cache_service import get_cache_service, cached
 router = APIRouter(prefix="/search", tags=["search"])
 
 
+class UnifiedSearchResult(BaseModel):
+    """Unified search result item with type discrimination."""
+    id: str
+    name: Optional[str] = None
+    content: str
+    similarity: float
+    type: str  # concept, analysis, source
+    metadata: Optional[dict] = None
+
+
+class UnifiedSearchResponse(BaseModel):
+    """Unified search response combining all result types."""
+    query: str
+    results: list[UnifiedSearchResult]
+    total: int
+    by_type: dict[str, int]
+
+
 class SearchResult(BaseModel):
     """Search result item."""
     id: str
@@ -28,6 +46,128 @@ class SearchResponse(BaseModel):
     query: str
     results: list[SearchResult]
     total: int
+
+
+@router.get("", response_model=UnifiedSearchResponse)
+async def unified_search(
+    q: str = Query(..., min_length=2, description="Search query"),
+    types: Optional[str] = Query(
+        None,
+        description="Comma-separated types to search: concept,analysis,source. Defaults to all.",
+    ),
+    limit: int = Query(20, ge=1, le=100, description="Maximum total results"),
+    threshold: float = Query(0.5, ge=0.0, le=1.0, description="Minimum similarity score"),
+):
+    """
+    Unified semantic search across concepts, analyses, and sources.
+
+    Searches all content types in parallel and returns combined results
+    sorted by similarity score.
+
+    Args:
+        q: Search query text
+        types: Optional filter for specific types (e.g., "concept,analysis")
+        limit: Maximum total results to return
+        threshold: Minimum similarity threshold (0-1)
+
+    Returns:
+        Combined results from all matching types, sorted by similarity
+    """
+    import asyncio
+
+    vector_service = get_vector_service()
+    cache = get_cache_service()
+
+    # Parse requested types
+    search_types = {"concept", "analysis", "source"}
+    if types:
+        requested = {t.strip().lower() for t in types.split(",")}
+        search_types = search_types & requested
+
+    # Check cache
+    cache_key = f"unified:{q}:{','.join(sorted(search_types))}:{threshold}"
+    cached_results = await cache.get_search_results(cache_key, "unified")
+    if cached_results:
+        by_type = {}
+        for r in cached_results:
+            by_type[r["type"]] = by_type.get(r["type"], 0) + 1
+        return UnifiedSearchResponse(
+            query=q,
+            results=[UnifiedSearchResult(**r) for r in cached_results],
+            total=len(cached_results),
+            by_type=by_type,
+        )
+
+    # Search all requested types in parallel
+    tasks = []
+    if "concept" in search_types:
+        tasks.append(("concept", vector_service.search_concepts(q, limit=limit, threshold=threshold)))
+    if "analysis" in search_types:
+        tasks.append(("analysis", vector_service.search_analyses(q, limit=limit, threshold=threshold)))
+    if "source" in search_types:
+        tasks.append(("source", vector_service.search_sources(q, limit=limit, threshold=threshold)))
+
+    # Execute searches in parallel
+    task_results = await asyncio.gather(*[t[1] for t in tasks])
+
+    # Combine and transform results
+    all_results: list[UnifiedSearchResult] = []
+    by_type: dict[str, int] = {}
+
+    for (type_name, _), results in zip(tasks, task_results):
+        by_type[type_name] = len(results)
+
+        for r in results:
+            if type_name == "concept":
+                all_results.append(UnifiedSearchResult(
+                    id=r["concept_id"],
+                    name=r["concept_name"],
+                    content=r["content"],
+                    similarity=r["similarity"],
+                    type="concept",
+                    metadata=None,
+                ))
+            elif type_name == "analysis":
+                all_results.append(UnifiedSearchResult(
+                    id=r["analysis_id"],
+                    name=f"{r['move_type']} analysis",
+                    content=r["content"],
+                    similarity=r["similarity"],
+                    type="analysis",
+                    metadata={"concept_id": r["concept_id"], "move_type": r["move_type"]},
+                ))
+            elif type_name == "source":
+                all_results.append(UnifiedSearchResult(
+                    id=f"{r['source_id']}:{r['chunk_index']}",
+                    name=f"Source chunk {r['chunk_index']}",
+                    content=r["content"],
+                    similarity=r["similarity"],
+                    type="source",
+                    metadata={"source_id": r["source_id"], "chunk_index": r["chunk_index"]},
+                ))
+
+    # Sort by similarity and limit
+    all_results.sort(key=lambda x: x.similarity, reverse=True)
+    all_results = all_results[:limit]
+
+    # Update by_type counts after limiting
+    final_by_type: dict[str, int] = {}
+    for r in all_results:
+        final_by_type[r.type] = final_by_type.get(r.type, 0) + 1
+
+    # Cache results
+    await cache.set_search_results(
+        cache_key,
+        [r.model_dump() for r in all_results],
+        "unified",
+    )
+
+    return UnifiedSearchResponse(
+        query=q,
+        results=all_results,
+        total=len(all_results),
+        by_type=final_by_type,
+    )
 
 
 @router.get("/concepts", response_model=SearchResponse)
@@ -228,3 +368,84 @@ async def initialize_vector_store():
         raise HTTPException(status_code=500, detail="Failed to initialize vector store")
 
     return {"status": "initialized"}
+
+
+# =============================================================================
+# Hybrid Search
+# =============================================================================
+
+class HybridSearchResult(BaseModel):
+    """Hybrid search result with score breakdown."""
+    id: str
+    content: str
+    source: Optional[str] = None
+    vector_score: float
+    keyword_score: float
+    combined_score: float
+    metadata: Optional[dict] = None
+
+
+class HybridSearchResponse(BaseModel):
+    """Hybrid search response."""
+    query: str
+    results: list[HybridSearchResult]
+    total: int
+    search_mode: str
+
+
+@router.get("/hybrid", response_model=HybridSearchResponse)
+async def hybrid_search(
+    q: str = Query(..., min_length=2, description="Search query"),
+    limit: int = Query(10, ge=1, le=50, description="Maximum results"),
+    vector_weight: float = Query(0.7, ge=0.0, le=1.0, description="Weight for vector similarity"),
+    keyword_weight: float = Query(0.3, ge=0.0, le=1.0, description="Weight for keyword matching"),
+    threshold: float = Query(0.4, ge=0.0, le=1.0, description="Minimum vector similarity"),
+):
+    """
+    Hybrid search combining vector similarity and keyword matching.
+
+    Uses Reciprocal Rank Fusion (RRF) to combine results from:
+    - pgvector cosine similarity search
+    - PostgreSQL full-text search
+
+    This typically provides better results than pure vector search
+    for queries with specific terminology or exact phrases.
+
+    Args:
+        q: Search query text
+        limit: Maximum results
+        vector_weight: Weight for vector similarity (0-1)
+        keyword_weight: Weight for keyword matching (0-1)
+        threshold: Minimum vector similarity threshold
+    """
+    from app.services.hybrid_search_service import get_hybrid_search_service
+
+    service = get_hybrid_search_service()
+    service.vector_weight = vector_weight
+    service.keyword_weight = keyword_weight
+
+    results = await service.search_documents(
+        query=q,
+        limit=limit,
+        vector_threshold=threshold,
+    )
+
+    search_results = [
+        HybridSearchResult(
+            id=r.id,
+            content=r.content,
+            source=r.source,
+            vector_score=r.vector_score,
+            keyword_score=r.keyword_score,
+            combined_score=r.combined_score,
+            metadata=r.metadata,
+        )
+        for r in results
+    ]
+
+    return HybridSearchResponse(
+        query=q,
+        results=search_results,
+        total=len(search_results),
+        search_mode="hybrid_rrf",
+    )

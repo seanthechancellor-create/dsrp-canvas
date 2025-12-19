@@ -305,6 +305,108 @@ export function DSRPGraph({ concept, result, onNodeClick, conceptMap, showConcep
           data: {},
         })
       })
+
+    } else if (move === 'woc' && Array.isArray(elements.effects)) {
+      // Web of Causality - forward causal effects
+      const nodeColors = DSRP_COLORS.R
+      const level1Effects: string[] = []
+      const level2Effects: string[] = []
+
+      elements.effects.slice(0, 6).forEach((eff: any, i: number) => {
+        const label = typeof eff === 'string' ? eff : eff.effect || String(eff)
+        const level = typeof eff === 'object' ? (eff.level || 1) : 1
+        const desc = typeof eff === 'object' ? eff.description : label
+        const nodeId = `effect-${i}`
+
+        nodes.push({
+          id: nodeId,
+          data: {
+            label: label.length > 14 ? label.slice(0, 13) + '…' : label,
+            fullLabel: label,
+            fullText: desc || label,
+            pattern: 'R',
+            fill: level === 1 ? nodeColors.fill : '#FFF8E1',
+            stroke: level === 1 ? nodeColors.stroke : '#FFA000',
+            textColor: nodeColors.text,
+          },
+        })
+
+        if (level === 1) {
+          level1Effects.push(nodeId)
+          edges.push({
+            id: `e-cause-${nodeId}`,
+            source: 'main',
+            target: nodeId,
+            data: { dynamic: '→' },
+          })
+        } else {
+          level2Effects.push(nodeId)
+        }
+      })
+
+      // Connect level 2 effects to level 1
+      level2Effects.forEach((l2Id, i) => {
+        const l1Id = level1Effects[i % level1Effects.length]
+        if (l1Id) {
+          edges.push({
+            id: `e-${l1Id}-${l2Id}`,
+            source: l1Id,
+            target: l2Id,
+            data: { dynamic: '→' },
+          })
+        }
+      })
+
+    } else if (move === 'waoc' && Array.isArray(elements.causes)) {
+      // Web of Anticausality - root causes
+      const nodeColors = DSRP_COLORS.R
+      const level1Causes: string[] = []
+      const level2Causes: string[] = []
+
+      elements.causes.slice(0, 6).forEach((c: any, i: number) => {
+        const label = typeof c === 'string' ? c : c.cause || String(c)
+        const level = typeof c === 'object' ? (c.level || 1) : 1
+        const desc = typeof c === 'object' ? c.description : label
+        const nodeId = `cause-${i}`
+
+        nodes.push({
+          id: nodeId,
+          data: {
+            label: label.length > 14 ? label.slice(0, 13) + '…' : label,
+            fullLabel: label,
+            fullText: desc || label,
+            pattern: 'R',
+            fill: level === 1 ? nodeColors.fill : '#FFECB3',
+            stroke: level === 1 ? nodeColors.stroke : '#FF8F00',
+            textColor: nodeColors.text,
+          },
+        })
+
+        if (level === 1) {
+          level1Causes.push(nodeId)
+          edges.push({
+            id: `e-${nodeId}-effect`,
+            source: nodeId,
+            target: 'main',
+            data: { dynamic: '→' },
+          })
+        } else {
+          level2Causes.push(nodeId)
+        }
+      })
+
+      // Connect level 2 causes to level 1
+      level2Causes.forEach((l2Id, i) => {
+        const l1Id = level1Causes[i % level1Causes.length]
+        if (l1Id) {
+          edges.push({
+            id: `e-${l2Id}-${l1Id}`,
+            source: l2Id,
+            target: l1Id,
+            data: { dynamic: '→' },
+          })
+        }
+      })
     }
 
     return { nodes, edges }
@@ -346,6 +448,12 @@ export function DSRPGraph({ concept, result, onNodeClick, conceptMap, showConcep
       layoutConfig = { type: 'dagre', rankdir: 'TB', nodesep: 60, ranksep: 120 }
     } else if (move === 'p-circle' || move === 'part-party') {
       layoutConfig = { type: 'circular', radius: 180 }
+    } else if (move === 'woc') {
+      // Web of Causality flows left to right (cause → effects)
+      layoutConfig = { type: 'dagre', rankdir: 'LR', nodesep: 50, ranksep: 100 }
+    } else if (move === 'waoc') {
+      // Web of Anticausality flows right to left (causes → effect)
+      layoutConfig = { type: 'dagre', rankdir: 'RL', nodesep: 50, ranksep: 100 }
     }
 
     try {
@@ -361,18 +469,27 @@ export function DSRPGraph({ concept, result, onNodeClick, conceptMap, showConcep
         node: {
           type: 'rect',
           style: {
-            size: (d: any) => d.data?.isMain ? [150, 40] : [120, 32],
+            // Scale node size based on total node count
+            size: (d: any) => {
+              const baseMainSize: [number, number] = nodeCount > 8 ? [120, 32] : nodeCount > 5 ? [130, 36] : [150, 40]
+              const baseSize: [number, number] = nodeCount > 8 ? [90, 26] : nodeCount > 5 ? [100, 28] : [120, 32]
+              return d.data?.isMain ? baseMainSize : baseSize
+            },
             fill: (d: any) => d.data?.fill || '#E3F2FD',
             stroke: (d: any) => d.data?.stroke || '#1976D2',
             lineWidth: (d: any) => d.data?.isMain ? 2 : 1.5,
-            radius: 8,
+            radius: nodeCount > 8 ? 6 : 8,
             cursor: 'pointer',
             shadowColor: 'rgba(0,0,0,0.15)',
-            shadowBlur: 10,
-            shadowOffsetY: 3,
+            shadowBlur: nodeCount > 8 ? 6 : 10,
+            shadowOffsetY: nodeCount > 8 ? 2 : 3,
             labelText: (d: any) => d.data?.label || '',
             labelFill: (d: any) => d.data?.textColor || '#333',
-            labelFontSize: (d: any) => d.data?.isMain ? 14 : 12,
+            labelFontSize: (d: any) => {
+              const baseFontMain = nodeCount > 8 ? 11 : nodeCount > 5 ? 12 : 14
+              const baseFont = nodeCount > 8 ? 9 : nodeCount > 5 ? 10 : 12
+              return d.data?.isMain ? baseFontMain : baseFont
+            },
             labelFontWeight: (d: any) => d.data?.isMain ? 600 : 400,
             labelFontFamily: "'IBM Plex Sans', -apple-system, sans-serif",
             labelPlacement: 'center',
@@ -719,16 +836,37 @@ function extractConcepts(text: unknown, max: number = 4): string[] {
 
   // Handle array input (e.g. from JSON list)
   if (Array.isArray(text)) {
-    return text.map(t => String(t)).slice(0, max)
+    return text.map(t => String(t).trim()).filter(t => t.length > 0).slice(0, max)
   }
 
   // Handle number or other types
-  const str = String(text)
+  const str = String(text).trim()
 
-  return str
-    .split(/[,.\n;•\-:()]+/)
-    .map(s => s.trim().replace(/^(it is |this is |a |an |the |and |or )/gi, ''))
-    .filter(s => s.length >= 2 && s.length <= 25)
-    .map(s => s.split(/\s+/).slice(0, 3).join(' '))
+  // If empty, return empty array
+  if (!str) return []
+
+  // Split on common delimiters
+  const parts = str
+    .split(/[,;\n•\-]+/)
+    .map(s => s.trim())
+    .filter(s => s.length >= 2)
+    // Remove common filler words at the start
+    .map(s => s.replace(/^(it is |this is |a |an |the |and |or |not |such as |like |including |for example )/gi, '').trim())
+    .filter(s => s.length >= 2 && s.length <= 50)
+    // Take first 4 words max per concept
+    .map(s => {
+      const words = s.split(/\s+/)
+      return words.slice(0, 4).join(' ')
+    })
+    .filter(s => s.length >= 2)
     .slice(0, max)
+
+  // If we couldn't split properly, try to extract the first meaningful phrase
+  if (parts.length === 0 && str.length > 0) {
+    // Take first 25 chars as a single concept
+    const shortened = str.length > 25 ? str.slice(0, 24) + '…' : str
+    return [shortened]
+  }
+
+  return parts
 }

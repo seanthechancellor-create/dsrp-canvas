@@ -3,6 +3,9 @@ import { Sidebar } from './components/Sidebar'
 import { DSRPPanel } from './components/DSRPPanel'
 import { DSRPGraph } from './components/DSRPGraph'
 import { DetailsDrawer } from './components/DetailsDrawer'
+import { SplashPage } from './components/SplashPage'
+
+type AppView = 'splash' | 'canvas'
 
 // Error boundary
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: Error | null }> {
@@ -56,6 +59,9 @@ interface ConceptMapEdge {
 }
 
 function AppContent() {
+  // View state: splash page or canvas
+  const [currentView, setCurrentView] = useState<AppView>('splash')
+
   const [concept, setConcept] = useState<string>('')
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [showConceptMap, setShowConceptMap] = useState(false)
@@ -66,6 +72,24 @@ function AppContent() {
   const [drillDownConcept, setDrillDownConcept] = useState<string | null>(null)
   const [selectedMove, setSelectedMove] = useState<string>('is-is-not')
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+  const [leftCollapsed, setLeftCollapsed] = useState(false)
+  const [rightCollapsed, setRightCollapsed] = useState(false)
+
+  // Multi-domain state
+  const [selectedDomain, setSelectedDomain] = useState<string | null>(null)
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(null)
+
+  // Handle entering canvas from splash page
+  const handleEnterCanvas = useCallback((category?: string, topic?: string) => {
+    if (category) {
+      setSelectedDomain(category)
+    }
+    if (topic) {
+      setSelectedTopic(topic)
+      setDrillDownConcept(topic)
+    }
+    setCurrentView('canvas')
+  }, [])
 
   // Add nodes and edges to the cumulative concept map
   const addToConceptMap = useCallback((newConcept: string, newResult: AnalysisResult) => {
@@ -90,6 +114,17 @@ function AppContent() {
       const elements = newResult.elements
       const move = newResult.move
 
+      // Helper to extract a short concept name from text
+      const extractShortLabel = (text: string, maxLen: number = 20): string => {
+        // Try to get first meaningful phrase or concept
+        const cleaned = text.trim()
+        // Look for the first noun phrase or key term (before any comma, colon, or dash)
+        const match = cleaned.match(/^([^,.:;-]+)/)?.[1]?.trim()
+        if (match && match.length <= maxLen) return match
+        // Otherwise truncate
+        return cleaned.length > maxLen ? cleaned.slice(0, maxLen - 1) + '…' : cleaned
+      }
+
       // Add related concepts based on move type
       if (move === 'is-is-not') {
         if (elements.identity) {
@@ -98,7 +133,7 @@ function AppContent() {
           if (!nodes.find(n => n.id === nodeId)) {
             nodes.push({
               id: nodeId,
-              label: 'Identity',
+              label: extractShortLabel(text),
               fullText: text,
               pattern: 'D',
             })
@@ -111,7 +146,7 @@ function AppContent() {
           if (!nodes.find(n => n.id === nodeId)) {
             nodes.push({
               id: nodeId,
-              label: 'Other',
+              label: extractShortLabel(text),
               fullText: text,
               pattern: 'D',
             })
@@ -146,13 +181,13 @@ function AppContent() {
         }
       } else if (move === 'p-circle' && Array.isArray(elements.perspectives)) {
         elements.perspectives.slice(0, 4).forEach((persp: any, i: number) => {
-          const label = typeof persp === 'string' ? persp : persp.point || String(persp)
+          const rawLabel = typeof persp === 'string' ? persp : persp.point || String(persp)
           const nodeId = `persp-${i}-${mainId}`
           if (!nodes.find(n => n.id === nodeId)) {
             nodes.push({
               id: nodeId,
-              label,
-              fullText: typeof persp === 'object' ? persp.view || label : label,
+              label: extractShortLabel(rawLabel),
+              fullText: typeof persp === 'object' ? persp.view || rawLabel : rawLabel,
               pattern: 'P',
             })
             edges.push({ id: `e-${nodeId}`, source: nodeId, target: mainId, dynamic: '✷' })
@@ -164,11 +199,39 @@ function AppContent() {
           if (!nodes.find(n => n.id === nodeId)) {
             nodes.push({
               id: nodeId,
-              label: reaction,
+              label: extractShortLabel(reaction),
               fullText: reaction,
               pattern: 'R',
             })
             edges.push({ id: `e-${nodeId}`, source: mainId, target: nodeId, dynamic: '⇔' })
+          }
+        })
+      } else if (move === 'woc' && Array.isArray(elements.effects)) {
+        elements.effects.slice(0, 4).forEach((eff: any, i: number) => {
+          const rawLabel = typeof eff === 'string' ? eff : eff.effect || String(eff)
+          const nodeId = `effect-${i}-${mainId}`
+          if (!nodes.find(n => n.id === nodeId)) {
+            nodes.push({
+              id: nodeId,
+              label: extractShortLabel(rawLabel),
+              fullText: typeof eff === 'object' ? eff.description || rawLabel : rawLabel,
+              pattern: 'R',
+            })
+            edges.push({ id: `e-${nodeId}`, source: mainId, target: nodeId, dynamic: '→' })
+          }
+        })
+      } else if (move === 'waoc' && Array.isArray(elements.causes)) {
+        elements.causes.slice(0, 4).forEach((c: any, i: number) => {
+          const rawLabel = typeof c === 'string' ? c : c.cause || String(c)
+          const nodeId = `cause-${i}-${mainId}`
+          if (!nodes.find(n => n.id === nodeId)) {
+            nodes.push({
+              id: nodeId,
+              label: extractShortLabel(rawLabel),
+              fullText: typeof c === 'object' ? c.description || rawLabel : rawLabel,
+              pattern: 'R',
+            })
+            edges.push({ id: `e-${nodeId}`, source: nodeId, target: mainId, dynamic: '→' })
           }
         })
       }
@@ -183,6 +246,9 @@ function AppContent() {
     addToConceptMap(newConcept, newResult)
     setDrillDownConcept(null) // Clear drill-down after analysis
     setIsDrawerOpen(true) // Open drawer to show analysis details
+    // Auto-collapse both sidebars to maximize canvas view for the drawer
+    setLeftCollapsed(true)
+    setRightCollapsed(true)
   }, [addToConceptMap])
 
   const handleNodeClick = useCallback((nodeId: string, label: string) => {
@@ -220,10 +286,35 @@ function AppContent() {
     setShowConceptMap(prev => !prev)
   }, [])
 
+  // Show splash page
+  if (currentView === 'splash') {
+    return <SplashPage onEnterCanvas={handleEnterCanvas} />
+  }
+
+  // Show canvas view
   return (
     <div className="app-container">
-      <Sidebar onConceptSelect={handleConceptSelect} />
-      <main className="canvas-container">
+      {/* Back to splash button */}
+      <button
+        className="back-to-splash"
+        onClick={() => setCurrentView('splash')}
+        title="Back to Knowledge Map"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+      </button>
+
+      <Sidebar
+        onConceptSelect={handleConceptSelect}
+        collapsed={leftCollapsed}
+        onToggleCollapse={() => setLeftCollapsed(!leftCollapsed)}
+        selectedDomain={selectedDomain}
+        selectedTopic={selectedTopic}
+        onDomainChange={setSelectedDomain}
+        onTopicChange={setSelectedTopic}
+      />
+      <main className={`canvas-container ${leftCollapsed ? 'left-collapsed' : ''} ${rightCollapsed ? 'right-collapsed' : ''}`}>
         {/* View toggle and map controls */}
         <div className="view-controls">
           <button
@@ -258,6 +349,8 @@ function AppContent() {
         onClear={handleClear}
         drillDownConcept={drillDownConcept}
         initialMove={selectedMove}
+        collapsed={rightCollapsed}
+        onToggleCollapse={() => setRightCollapsed(!rightCollapsed)}
       />
 
       {/* Details Drawer - shows when analysis completes */}
@@ -267,6 +360,8 @@ function AppContent() {
         concept={concept}
         result={result}
         onDrillDown={handleDrawerDrillDown}
+        selectedDomain={selectedDomain}
+        selectedTopic={selectedTopic}
       />
 
       <style>{`
@@ -281,6 +376,13 @@ function AppContent() {
           flex: 1;
           position: relative;
           overflow: hidden;
+          transition: margin 0.3s ease;
+        }
+        .canvas-container.left-collapsed {
+          margin-left: 0;
+        }
+        .canvas-container.right-collapsed {
+          margin-right: 0;
         }
         .view-controls {
           position: absolute;
@@ -329,6 +431,29 @@ function AppContent() {
         }
         .clear-map-btn:hover {
           background: #f44336;
+          color: white;
+        }
+        .back-to-splash {
+          position: fixed;
+          top: 12px;
+          left: 12px;
+          z-index: 1000;
+          width: 36px;
+          height: 36px;
+          border: 1px solid rgba(255,255,255,0.2);
+          border-radius: 8px;
+          background: rgba(22, 33, 62, 0.95);
+          color: rgba(255,255,255,0.7);
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s;
+          backdrop-filter: blur(8px);
+        }
+        .back-to-splash:hover {
+          background: #e94560;
+          border-color: #e94560;
           color: white;
         }
       `}</style>

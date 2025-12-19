@@ -53,15 +53,20 @@ Your task is to apply one of the 6 Moves to analyze a concept:
 
 6. P-Circle (P): Map multiple perspectives on this concept. Who sees it differently and how?
 
+7. WoC - Web of Causality (R): Map forward causal effects. What does this CAUSE to happen?
+
+8. WAoC - Web of Anticausality (R): Map root causes. What CAUSED this to exist/happen?
+
 Always respond with structured JSON containing your analysis."""
 
 
 MOVE_PROMPTS = {
     "is-is-not": """Apply the IS/IS NOT move to analyze: "{concept}"
 
-Provide:
-1. IDENTITY: What this concept fundamentally IS (its defining characteristics)
-2. OTHER: What this concept IS NOT (common misconceptions, related but different concepts)
+IMPORTANT: You MUST provide BOTH identity AND other. This is a DISTINCTION - you cannot have one without the other.
+
+1. IDENTITY: List 3-4 specific things that "{concept}" fundamentally IS (key characteristics, examples, components)
+2. OTHER: List 3-4 specific things that "{concept}" IS NOT (common misconceptions, related but different concepts, what people confuse it with)
 3. BOUNDARY: The distinguishing line between identity and other
 
 {context}
@@ -70,12 +75,14 @@ Respond in JSON format:
 {{
   "pattern": "D",
   "elements": {{
-    "identity": "What it IS...",
-    "other": "What it IS NOT..."
+    "identity": "characteristic 1, characteristic 2, characteristic 3",
+    "other": "not-this 1, not-this 2, not-this 3"
   }},
   "boundary": "The distinguishing criteria...",
   "reasoning": "Your analysis explaining the distinction..."
-}}""",
+}}
+
+CRITICAL: The "other" field must contain specific concepts that {concept} is NOT. Do not leave it empty.""",
     "zoom-in": """Apply the ZOOM IN move to analyze: "{concept}"
 
 Identify the PARTS that make up this concept:
@@ -187,6 +194,58 @@ Respond in JSON format:
   "tensions": ["Where perspectives conflict..."],
   "synthesis": "How perspectives complement each other...",
   "reasoning": "Your analysis of multiple viewpoints..."
+}}""",
+    "woc": """Apply the WEB OF CAUSALITY (WoC) move to analyze: "{concept}"
+
+Map the FORWARD CAUSAL EFFECTS - what does this concept CAUSE to happen?
+
+1. Identify immediate effects (what happens directly because of this)
+2. Identify secondary effects (what happens because of those effects)
+3. Map the causal chain forward in time
+
+{context}
+
+Respond in JSON format:
+{{
+  "pattern": "R",
+  "elements": {{
+    "cause": "{concept}",
+    "effects": [
+      {{"effect": "Immediate effect 1", "level": 1, "description": "How this happens..."}},
+      {{"effect": "Immediate effect 2", "level": 1, "description": "How this happens..."}},
+      {{"effect": "Secondary effect 1", "level": 2, "description": "Caused by effect 1..."}},
+      {{"effect": "Secondary effect 2", "level": 2, "description": "Caused by effect 2..."}}
+    ]
+  }},
+  "causal_chain": "Description of the overall causal flow...",
+  "time_horizon": "How far into the future these effects extend",
+  "reasoning": "Your analysis of causal relationships..."
+}}""",
+    "waoc": """Apply the WEB OF ANTICAUSALITY (WAoC) move to analyze: "{concept}"
+
+Map the ROOT CAUSES - what CAUSED this concept to exist or happen?
+
+1. Identify immediate causes (what directly led to this)
+2. Identify deeper causes (what caused those causes)
+3. Trace the causal chain backward in time
+
+{context}
+
+Respond in JSON format:
+{{
+  "pattern": "R",
+  "elements": {{
+    "effect": "{concept}",
+    "causes": [
+      {{"cause": "Immediate cause 1", "level": 1, "description": "How this led to the concept..."}},
+      {{"cause": "Immediate cause 2", "level": 1, "description": "How this led to the concept..."}},
+      {{"cause": "Root cause 1", "level": 2, "description": "What caused cause 1..."}},
+      {{"cause": "Root cause 2", "level": 2, "description": "What caused cause 2..."}}
+    ]
+  }},
+  "root_analysis": "Description of the fundamental origins...",
+  "historical_context": "How far back the causal chain extends",
+  "reasoning": "Your analysis of root causes..."
 }}""",
 }
 
@@ -366,6 +425,62 @@ class OpenAIProvider(BaseAIProvider):
         return response.choices[0].message.content
 
 
+class OllamaProvider(BaseAIProvider):
+    """Ollama local LLM provider."""
+
+    def __init__(self):
+        self.base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        self.model_name = os.getenv("OLLAMA_MODEL", "llama3.2")
+        self._available = False
+
+        # Check if Ollama is reachable
+        try:
+            import httpx
+            with httpx.Client(timeout=5.0) as client:
+                response = client.get(f"{self.base_url}/api/tags")
+                if response.status_code == 200:
+                    models = response.json().get("models", [])
+                    model_names = [m.get("name", "").split(":")[0] for m in models]
+                    if self.model_name.split(":")[0] in model_names or any(self.model_name in m for m in model_names):
+                        self._available = True
+                        logger.info(f"Ollama provider initialized with model: {self.model_name}")
+                    else:
+                        logger.warning(f"Ollama model '{self.model_name}' not found. Available: {model_names}")
+        except Exception as e:
+            logger.warning(f"Ollama provider not available: {e}")
+
+    @property
+    def name(self) -> str:
+        return "ollama"
+
+    @property
+    def available(self) -> bool:
+        return self._available
+
+    async def generate(self, system_prompt: str, user_prompt: str) -> str:
+        if not self._available:
+            raise RuntimeError("Ollama provider not available")
+
+        import httpx
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                f"{self.base_url}/api/generate",
+                json={
+                    "model": self.model_name,
+                    "prompt": f"{system_prompt}\n\n{user_prompt}\n\nIMPORTANT: Return ONLY valid JSON.",
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.7,
+                        "num_predict": 2000,
+                    }
+                }
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data.get("response", "")
+
+
 class DSRPAgent:
     """AI agent for DSRP analysis supporting multiple providers."""
 
@@ -384,13 +499,14 @@ class DSRPAgent:
         self.providers["gemini"] = GeminiProvider()
         self.providers["claude"] = ClaudeProvider()
         self.providers["openai"] = OpenAIProvider()
+        self.providers["ollama"] = OllamaProvider()
 
         # Determine active provider
         self.active_provider = self._get_active_provider()
         if self.active_provider:
             logger.info(f"DSRP Agent using provider: {self.active_provider.name}")
         else:
-            logger.warning("No AI providers available!")
+            logger.warning("No AI providers available! Set AI_PROVIDER=ollama or configure API keys.")
 
     def _get_active_provider(self) -> BaseAIProvider | None:
         """Get the active provider based on preference and availability."""
@@ -401,7 +517,7 @@ class DSRPAgent:
                 return provider
 
         # Fall back to any available provider
-        for name in ["gemini", "claude", "openai"]:
+        for name in ["gemini", "claude", "openai", "ollama"]:
             provider = self.providers.get(name)
             if provider and provider.available:
                 return provider
