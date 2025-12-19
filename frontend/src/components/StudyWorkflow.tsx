@@ -292,7 +292,7 @@ export function StudyWorkflow({ onBack }: StudyWorkflowProps) {
       </nav>
 
       {/* Main Content */}
-      <main className="workflow-content">
+      <main className="workflow-content" tabIndex={0}>
         {renderCurrentStep()}
       </main>
 
@@ -337,7 +337,9 @@ export function StudyWorkflow({ onBack }: StudyWorkflowProps) {
         .study-workflow {
           display: flex;
           flex-direction: column;
-          min-height: 100vh;
+          height: 100vh;
+          max-height: 100vh;
+          overflow: hidden;
           background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
           color: white;
           font-family: 'IBM Plex Sans', -apple-system, sans-serif;
@@ -351,6 +353,7 @@ export function StudyWorkflow({ onBack }: StudyWorkflowProps) {
           padding: 16px 24px;
           background: rgba(0, 0, 0, 0.3);
           border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          flex-shrink: 0;
         }
 
         .back-btn {
@@ -404,6 +407,7 @@ export function StudyWorkflow({ onBack }: StudyWorkflowProps) {
           padding: 24px;
           background: rgba(0, 0, 0, 0.2);
           border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          flex-shrink: 0;
         }
 
         .step-wrapper {
@@ -495,8 +499,22 @@ export function StudyWorkflow({ onBack }: StudyWorkflowProps) {
         /* Content */
         .workflow-content {
           flex: 1;
+          min-height: 0;
           padding: 24px;
           overflow-y: auto;
+          overflow-x: hidden;
+          -webkit-overflow-scrolling: touch;
+          outline: none;
+          scroll-behavior: smooth;
+        }
+
+        .workflow-content:focus {
+          outline: none;
+        }
+
+        .workflow-content:focus-visible {
+          outline: 2px solid rgba(233, 69, 96, 0.5);
+          outline-offset: -2px;
         }
 
         /* Footer */
@@ -507,6 +525,7 @@ export function StudyWorkflow({ onBack }: StudyWorkflowProps) {
           padding: 16px 24px;
           background: rgba(0, 0, 0, 0.3);
           border-top: 1px solid rgba(255, 255, 255, 0.1);
+          flex-shrink: 0;
         }
 
         .nav-btn {
