@@ -286,13 +286,14 @@ The 8 Moves are cognitive tools based on DSRP:
         .gather-step {
           max-width: 600px;
           margin: 0 auto;
+          padding-bottom: 24px;
         }
 
         .step-header {
           display: flex;
           align-items: center;
           gap: 16px;
-          margin-bottom: 32px;
+          margin-bottom: 24px;
         }
 
         .step-icon {
@@ -320,7 +321,7 @@ The 8 Moves are cognitive tools based on DSRP:
         .upload-zone {
           border: 2px dashed rgba(255, 255, 255, 0.2);
           border-radius: 16px;
-          padding: 48px;
+          padding: 32px;
           text-align: center;
           cursor: pointer;
           transition: all 0.3s;
@@ -371,7 +372,7 @@ The 8 Moves are cognitive tools based on DSRP:
           display: flex;
           align-items: center;
           gap: 16px;
-          margin: 24px 0;
+          margin: 16px 0;
           color: rgba(255, 255, 255, 0.4);
         }
 
