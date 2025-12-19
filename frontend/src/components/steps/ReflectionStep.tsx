@@ -38,10 +38,43 @@ export function ReflectionStep({ sessionId, text, sourceName, onComplete }: Refl
     setError(null)
     setProgress(0)
 
+    // Agent phases with their progress ranges
+    const agents = [
+      { name: 'Summary Agent', start: 0, end: 25 },
+      { name: 'Structure Agent', start: 25, end: 50 },
+      { name: 'DSRP Agents', start: 50, end: 85 },
+      { name: 'Cross-Reference Agent', start: 85, end: 100 },
+    ]
+
+    let currentAgentIndex = 0
+    let animationProgress = 0
+    let cancelled = false
+
+    // Animate progress while waiting for API
+    const progressInterval = setInterval(() => {
+      if (cancelled) return
+
+      const agent = agents[currentAgentIndex]
+      if (!agent) return
+
+      // Slowly increment within current agent's range
+      const agentRange = agent.end - agent.start
+      const targetProgress = agent.start + (agentRange * 0.9) // Go to 90% of agent's range
+
+      if (animationProgress < targetProgress) {
+        animationProgress += 0.5
+        setProgress(Math.min(animationProgress, targetProgress))
+        setCurrentAgent(`${agent.name} (${Math.round(((animationProgress - agent.start) / agentRange) * 100)}%)`)
+      } else if (currentAgentIndex < agents.length - 1) {
+        currentAgentIndex++
+        const nextAgent = agents[currentAgentIndex]
+        animationProgress = nextAgent.start
+        setCurrentAgent(`${nextAgent.name} (0%)`)
+      }
+    }, 100)
+
     try {
-      // Simulate agent progress
-      setCurrentAgent('Summary Agent')
-      setProgress(10)
+      setCurrentAgent('Summary Agent (0%)')
 
       const response = await fetch('/api/study/steps/reflection', {
         method: 'POST',
@@ -53,8 +86,8 @@ export function ReflectionStep({ sessionId, text, sourceName, onComplete }: Refl
         }),
       })
 
-      setProgress(50)
-      setCurrentAgent('DSRP Agents')
+      cancelled = true
+      clearInterval(progressInterval)
 
       if (!response.ok) {
         throw new Error('Analysis failed')
@@ -62,9 +95,11 @@ export function ReflectionStep({ sessionId, text, sourceName, onComplete }: Refl
 
       const data = await response.json()
       setProgress(100)
-      setCurrentAgent('Complete')
+      setCurrentAgent('Complete (100%)')
       setResult(data)
     } catch (err) {
+      cancelled = true
+      clearInterval(progressInterval)
       setError(err instanceof Error ? err.message : 'Analysis failed')
     } finally {
       setIsAnalyzing(false)
