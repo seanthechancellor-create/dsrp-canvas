@@ -1,6 +1,6 @@
 # DSRP Knowledge Ingestion Pipeline
 
-A Python-based document processing pipeline that analyzes documents using the DSRP-483 framework and stores results in both MongoDB (vector search) and TypeDB (knowledge graph).
+A Python-based document processing pipeline that analyzes documents using the DSRP-483 framework and stores results in both PostgreSQL/pgvector (vector search) and TypeDB (knowledge graph).
 
 ## Architecture
 
@@ -15,9 +15,9 @@ A Python-based document processing pipeline that analyzes documents using the DS
                     │                          │                          │
                     ▼                          ▼                          ▼
            ┌───────────────┐          ┌───────────────┐          ┌───────────────┐
-           │    MongoDB    │          │    Claude     │          │    TypeDB     │
-           │  (Episodic    │          │   (DSRP       │─────────▶│  (Semantic    │
-           │   Memory)     │          │  Extraction)  │          │   Memory)     │
+           │  PostgreSQL   │          │    Claude     │          │    TypeDB     │
+           │  + pgvector   │          │   (DSRP       │─────────▶│  (Semantic    │
+           │  (Episodic)   │          │  Extraction)  │          │   Memory)     │
            └───────────────┘          └───────────────┘          └───────────────┘
                  │                                                      │
                  │  Vector Search (RAG)                                 │  Knowledge Graph
@@ -38,8 +38,8 @@ A Python-based document processing pipeline that analyzes documents using the DS
 ### 1. Start the required services
 
 ```bash
-# Start MongoDB and TypeDB
-docker-compose up -d mongodb typedb
+# Start PostgreSQL and TypeDB
+docker-compose up -d postgres typedb
 
 # Wait for services to be healthy
 docker-compose ps
@@ -61,7 +61,7 @@ cp your_document.pdf ./documents/inbox/
 docker-compose build pipeline
 
 # Run the pipeline
-docker-compose run --rm pipeline python ingest.py
+docker-compose --profile tools run --rm pipeline python ingest.py
 ```
 
 **Option B: Run locally**
@@ -78,7 +78,7 @@ pip install -r requirements.txt
 
 # Set environment variables
 export ANTHROPIC_API_KEY="your-api-key"
-export MONGODB_URL="mongodb://localhost:27017/dsrp_knowledge"
+export POSTGRES_URL="postgresql://dsrp:dsrp_password@localhost:5432/dsrp_canvas"
 export TYPEDB_HOST="localhost"
 export TYPEDB_PORT="1729"
 
@@ -109,7 +109,9 @@ python ingest.py --verbose
 | Environment Variable | Default | Description |
 |---------------------|---------|-------------|
 | `ANTHROPIC_API_KEY` | (required) | Your Anthropic API key for Claude |
-| `MONGODB_URL` | `mongodb://localhost:27017/dsrp_knowledge` | MongoDB connection string |
+| `GOOGLE_API_KEY` | (optional) | Google API key for Gemini (alternative LLM) |
+| `OPENAI_API_KEY` | (optional) | OpenAI API key for GPT (alternative LLM) |
+| `POSTGRES_URL` | `postgresql://dsrp:dsrp_password@localhost:5432/dsrp_canvas` | PostgreSQL connection string |
 | `TYPEDB_HOST` | `localhost` | TypeDB server hostname |
 | `TYPEDB_PORT` | `1729` | TypeDB server port |
 | `TYPEDB_DATABASE` | `dsrp_483` | TypeDB database name |
@@ -133,11 +135,11 @@ Generate vector embeddings using `sentence-transformers`:
 - Dimensions: 384
 - Runs locally (no API key needed)
 
-### 4. Store Episodic Memory (MongoDB)
+### 4. Store Episodic Memory (PostgreSQL/pgvector)
 Save each chunk with its embedding:
 ```json
 {
-  "_id": "doc123_chunk_1",
+  "id": "doc123_chunk_1",
   "document_id": "doc123",
   "chunk_number": 1,
   "text": "The actual text content...",
@@ -146,8 +148,8 @@ Save each chunk with its embedding:
 }
 ```
 
-### 5. Extract DSRP (Claude)
-Send each chunk to Claude with a specialized prompt that extracts:
+### 5. Extract DSRP (Claude/Gemini/GPT)
+Send each chunk to the LLM with a specialized prompt that extracts:
 - **Distinctions (D)**: Identity/Other pairs
 - **Systems (S)**: Part/Whole relationships
 - **Relationships (R)**: Action/Reaction pairs
@@ -184,16 +186,22 @@ Insert structured DSRP patterns into the knowledge graph:
 
 ## Querying the Results
 
-### MongoDB (Vector Search)
+### PostgreSQL/pgvector (Vector Search)
 
 ```python
-from pymongo import MongoClient
+import psycopg
 
-client = MongoClient("mongodb://localhost:27017")
-db = client.dsrp_knowledge
+conn = psycopg.connect("postgresql://dsrp:dsrp_password@localhost:5432/dsrp_canvas")
 
 # Find similar chunks (for RAG)
-chunks = db.chunks.find({"document_id": "doc123"}).sort("chunk_number", 1)
+with conn.cursor() as cur:
+    cur.execute("""
+        SELECT id, text, 1 - (embedding <=> %s::vector) as similarity
+        FROM pipeline_chunks
+        ORDER BY embedding <=> %s::vector
+        LIMIT 5;
+    """, (query_embedding, query_embedding))
+    results = cur.fetchall()
 ```
 
 ### TypeDB (Knowledge Graph)
@@ -233,16 +241,30 @@ docker-compose ps typedb
 docker-compose logs typedb
 ```
 
-### "ANTHROPIC_API_KEY not set"
+### "No API key set"
 ```bash
+# Set at least one LLM API key
 export ANTHROPIC_API_KEY="sk-ant-..."
+# OR
+export GOOGLE_API_KEY="..."
+# OR
+export OPENAI_API_KEY="sk-..."
 ```
 
-### "MongoDB connection failed"
+### "PostgreSQL connection failed"
 ```bash
-# Check MongoDB is running
-docker-compose ps mongodb
+# Check PostgreSQL is running
+docker-compose ps postgres
 
 # Test connection
-docker-compose exec mongodb mongosh --eval "db.adminCommand('ping')"
+docker-compose exec postgres psql -U dsrp -d dsrp_canvas -c "SELECT 1;"
 ```
+
+## Scale Considerations
+
+For large knowledge maps with thousands of documents:
+
+1. **HNSW Index**: The pgvector HNSW index provides efficient approximate nearest neighbor search
+2. **Batch Processing**: Process documents in batches to manage memory
+3. **Pagination**: Use LIMIT/OFFSET or cursor-based pagination for large result sets
+4. **Connection Pooling**: The pipeline uses psycopg connection pooling for efficiency

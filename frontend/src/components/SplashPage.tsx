@@ -1,8 +1,13 @@
 /**
  * SplashPage - Landing page with category tree hierarchy
+ *
+ * Features:
+ * - Search/filter for large knowledge maps
+ * - Stats overview
+ * - Quick access to canvas
  */
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { CategoryTree } from './CategoryTree'
 import { useCategoryStore } from '../stores/categoryStore'
 
@@ -12,6 +17,7 @@ interface SplashPageProps {
 
 export function SplashPage({ onEnterCanvas }: SplashPageProps) {
   const { categories, fetchFromBackend } = useCategoryStore()
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     fetchFromBackend()
@@ -37,6 +43,25 @@ export function SplashPage({ onEnterCanvas }: SplashPageProps) {
         </div>
 
         <div className="header-right">
+          {/* Search input for large knowledge maps */}
+          <div className="search-container">
+            <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8"/>
+              <path d="M21 21l-4.35-4.35"/>
+            </svg>
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Search categories & topics..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button className="search-clear" onClick={() => setSearchQuery('')}>
+                ×
+              </button>
+            )}
+          </div>
           <div className="stats-row">
             <div className="stat">
               <span className="stat-value">{categories.length}</span>
@@ -62,6 +87,7 @@ export function SplashPage({ onEnterCanvas }: SplashPageProps) {
           onTopicSelect={(category, topic) => onEnterCanvas(category, topic)}
           onCategorySelect={(category) => onEnterCanvas(category)}
           editable={true}
+          searchQuery={searchQuery}
         />
       </main>
 
@@ -225,6 +251,65 @@ export function SplashPage({ onEnterCanvas }: SplashPageProps) {
         .enter-canvas-btn:hover {
           transform: translateY(-2px);
           box-shadow: 0 6px 25px rgba(233, 69, 96, 0.4);
+        }
+
+        /* Search input styles */
+        .search-container {
+          position: relative;
+          display: flex;
+          align-items: center;
+        }
+
+        .search-icon {
+          position: absolute;
+          left: 12px;
+          color: rgba(255,255,255,0.4);
+          pointer-events: none;
+        }
+
+        .search-input {
+          padding: 10px 32px 10px 36px;
+          width: 220px;
+          background: rgba(255,255,255,0.08);
+          border: 1px solid rgba(255,255,255,0.15);
+          border-radius: 8px;
+          color: white;
+          font-size: 0.85rem;
+          font-family: inherit;
+          transition: all 0.2s;
+        }
+
+        .search-input::placeholder {
+          color: rgba(255,255,255,0.4);
+        }
+
+        .search-input:focus {
+          outline: none;
+          background: rgba(255,255,255,0.12);
+          border-color: #e94560;
+          box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.15);
+        }
+
+        .search-clear {
+          position: absolute;
+          right: 8px;
+          width: 20px;
+          height: 20px;
+          border: none;
+          background: rgba(255,255,255,0.15);
+          border-radius: 50%;
+          color: rgba(255,255,255,0.7);
+          font-size: 14px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.15s;
+        }
+
+        .search-clear:hover {
+          background: #e94560;
+          color: white;
         }
 
         .splash-content {

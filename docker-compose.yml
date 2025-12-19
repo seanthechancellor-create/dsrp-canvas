@@ -1,5 +1,5 @@
 services:
-  # Knowledge Graph Database
+  # Knowledge Graph Database - DSRP patterns and relationships
   typedb:
     image: typedb/typedb:latest
     ports:
@@ -14,7 +14,8 @@ services:
       retries: 3
       start_period: 30s
 
-  # Vector Database (PostgreSQL + pgvector)
+  # Vector Database - Documents, chunks, embeddings, semantic search
+  # Replaces MongoDB - unified storage for RAG pipeline
   postgres:
     image: pgvector/pgvector:pg16
     ports:
@@ -31,7 +32,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Cache Layer
+  # Cache Layer - API response caching
   redis:
     image: redis:7-alpine
     ports:
@@ -45,7 +46,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # Ollama for Local LLM and Embeddings
+  # Ollama for Local LLM and Embeddings (optional - can use cloud APIs)
   ollama:
     image: ollama/ollama:latest
     ports:
@@ -60,6 +61,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+    profiles:
+      - local-llm  # Only start with: docker-compose --profile local-llm up
     # Uncomment for GPU support (requires nvidia-container-toolkit)
     # deploy:
     #   resources:
@@ -68,21 +71,6 @@ services:
     #         - driver: nvidia
     #           count: all
     #           capabilities: [gpu]
-
-  # MongoDB for Document Storage (Episodic Memory)
-  mongodb:
-    image: mongo:7
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
-      - ./documents:/documents  # Shared folder for document ingestion
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
 
   # FastAPI Backend
   backend:
@@ -94,17 +82,20 @@ services:
     env_file:
       - .env
     environment:
-      - AI_PROVIDER=${AI_PROVIDER:-gemini}
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      # AI Providers (at least one required)
+      - AI_PROVIDER=${AI_PROVIDER:-anthropic}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # Database connections
       - TYPEDB_HOST=typedb
       - TYPEDB_PORT=1729
       - POSTGRES_URL=postgresql://dsrp:dsrp_password@postgres:5432/dsrp_canvas
       - REDIS_URL=redis://redis:6379/0
-      - MONGODB_URL=mongodb://mongodb:27017/dsrp_knowledge
+      # Ollama (optional - for local embeddings)
       - OLLAMA_BASE_URL=http://ollama:11434
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-nomic-embed-text}
     volumes:
       - ./backend:/app
       - ./uploads:/app/uploads
@@ -116,10 +107,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      mongodb:
-        condition: service_healthy
-      ollama:
-        condition: service_started  # Don't wait for Ollama health - it's optional
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   # MCP Server (for Claude Desktop integration)
@@ -141,6 +128,8 @@ services:
     depends_on:
       - backend
     command: fastmcp run mcp/dsrp_server.py --transport sse --port 8001
+    profiles:
+      - mcp  # Only start with: docker-compose --profile mcp up
 
   # React Frontend
   frontend:
@@ -160,9 +149,8 @@ services:
     command: npm run dev -- --host
 
   # DSRP Knowledge Ingestion Pipeline
-  # Processes documents, extracts DSRP patterns, stores in MongoDB + TypeDB
-  # Usage: docker-compose run pipeline python ingest.py
-  # Usage: docker-compose run pipeline python study_guide_ingestor.py <pdf_path>
+  # Processes documents (PDF, video, audio), extracts DSRP patterns
+  # Usage: docker-compose --profile tools run pipeline python ingest.py <file>
   pipeline:
     build:
       context: ./pipeline
@@ -170,16 +158,19 @@ services:
     env_file:
       - .env
     environment:
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      # AI Providers
+      - AI_PROVIDER=${AI_PROVIDER:-anthropic}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # Database connections
       - TYPEDB_HOST=typedb
       - TYPEDB_PORT=1729
       - TYPEDB_DATABASE=dsrp_483
       - TYPEDB_USERNAME=admin
       - TYPEDB_PASSWORD=password
-      - MONGODB_URL=mongodb://mongodb:27017/dsrp_knowledge
       - POSTGRES_URL=postgresql://dsrp:dsrp_password@postgres:5432/dsrp_canvas
+      # Embeddings
       - OLLAMA_BASE_URL=http://ollama:11434
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3}
       - EMBEDDING_MODEL=${EMBEDDING_MODEL:-nomic-embed-text}
@@ -189,14 +180,8 @@ services:
     depends_on:
       typedb:
         condition: service_healthy
-      mongodb:
-        condition: service_healthy
       postgres:
         condition: service_healthy
-      ollama:
-        condition: service_started  # Don't wait for Ollama health - it's optional
-    # By default, just keep container available for manual runs
-    # Use: docker-compose run pipeline python ingest.py
     command: ["tail", "-f", "/dev/null"]
     profiles:
       - tools  # Only start with: docker-compose --profile tools up
@@ -205,5 +190,4 @@ volumes:
   typedb_data:
   postgres_data:
   redis_data:
-  mongodb_data:
   ollama_data:

@@ -115,12 +115,26 @@ async def list_concepts(
     offset: int = 0,
     domain: str | None = None,
     topic: str | None = None,
+    search: str | None = None,
 ):
-    """List concepts with pagination and optional domain/topic filtering."""
+    """List concepts with pagination, filtering, and search.
+
+    Args:
+        limit: Maximum number of results (default 50, max 500)
+        offset: Number of results to skip for pagination
+        domain: Filter by domain name
+        topic: Filter by topic name
+        search: Search query to filter by name/description
+
+    Returns:
+        Paginated list with total count for UI pagination
+    """
+    limit = min(limit, 500)  # Cap at 500 for performance
+
     # Try TypeDB first
     typedb = get_typedb_service()
     try:
-        results = await typedb.list_concepts(limit=limit, offset=offset)
+        results = await typedb.list_concepts(limit=1000, offset=0)  # Get all for filtering
         if results:
             concepts = [
                 {
@@ -138,25 +152,56 @@ async def list_concepts(
                 }
                 for r in results
             ]
-            # Filter by domain/topic if specified
+            # Apply filters
             if domain:
                 concepts = [c for c in concepts if c.get("domain") == domain]
             if topic:
                 concepts = [c for c in concepts if c.get("topic") == topic]
-            return concepts
+            if search:
+                search_lower = search.lower()
+                concepts = [
+                    c for c in concepts
+                    if search_lower in (c.get("name") or "").lower()
+                    or search_lower in (c.get("description") or "").lower()
+                ]
+
+            total = len(concepts)
+            paginated = concepts[offset : offset + limit]
+            return {
+                "items": paginated,
+                "total": total,
+                "limit": limit,
+                "offset": offset,
+                "has_more": offset + limit < total,
+            }
     except Exception as e:
         logger.debug(f"TypeDB list failed: {e}")
 
     # Fallback to in-memory
     all_concepts = list(concepts_db.values())
 
-    # Filter by domain and topic
+    # Apply filters
     if domain:
         all_concepts = [c for c in all_concepts if c.get("domain") == domain]
     if topic:
         all_concepts = [c for c in all_concepts if c.get("topic") == topic]
+    if search:
+        search_lower = search.lower()
+        all_concepts = [
+            c for c in all_concepts
+            if search_lower in (c.get("name") or "").lower()
+            or search_lower in (c.get("description") or "").lower()
+        ]
 
-    return all_concepts[offset : offset + limit]
+    total = len(all_concepts)
+    paginated = all_concepts[offset : offset + limit]
+    return {
+        "items": paginated,
+        "total": total,
+        "limit": limit,
+        "offset": offset,
+        "has_more": offset + limit < total,
+    }
 
 
 @router.get("/domains/list")

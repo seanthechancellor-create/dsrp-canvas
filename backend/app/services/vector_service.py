@@ -1,8 +1,11 @@
 """
 Vector Search Service using pgvector
 
-Provides semantic search capabilities for DSRP concepts and analyses.
-Uses embeddings stored in PostgreSQL with pgvector extension.
+Unified storage for DSRP knowledge base:
+- Document storage (replaces MongoDB)
+- Vector embeddings for semantic search
+- RAG retrieval for document chunks
+
 Supports multiple embedding providers: Ollama (default), OpenAI.
 
 Setup:
@@ -13,7 +16,9 @@ Setup:
 
 import os
 import logging
+import json
 from typing import Optional
+from datetime import datetime
 import hashlib
 import httpx
 
@@ -144,11 +149,27 @@ class VectorService:
                         );
                     """)
 
+                    # Create documents table (replaces MongoDB)
+                    cur.execute("""
+                        CREATE TABLE IF NOT EXISTS documents (
+                            id SERIAL PRIMARY KEY,
+                            document_id VARCHAR(255) UNIQUE NOT NULL,
+                            filename VARCHAR(500) NOT NULL,
+                            file_type VARCHAR(50),
+                            file_size BIGINT,
+                            total_chunks INTEGER DEFAULT 0,
+                            status VARCHAR(50) DEFAULT 'pending',
+                            metadata JSONB DEFAULT '{}',
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        );
+                    """)
+
                     # Create embeddings table for document chunks (RAG pipeline)
                     cur.execute(f"""
                         CREATE TABLE IF NOT EXISTS document_embeddings (
                             id SERIAL PRIMARY KEY,
-                            document_id VARCHAR(255) NOT NULL,
+                            document_id VARCHAR(255) NOT NULL REFERENCES documents(document_id) ON DELETE CASCADE,
                             chunk_id VARCHAR(255) UNIQUE NOT NULL,
                             chunk_index INTEGER NOT NULL,
                             filename VARCHAR(500),
@@ -156,6 +177,7 @@ class VectorService:
                             content_hash VARCHAR(64) NOT NULL,
                             embedding vector({EMBEDDING_DIMENSIONS}),
                             metadata JSONB DEFAULT '{{}}',
+                            dsrp_extracted BOOLEAN DEFAULT FALSE,
                             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                         );
                     """)
@@ -735,6 +757,262 @@ class VectorService:
         except Exception as e:
             logger.error(f"Failed to search documents: {e}")
             return []
+
+    # =========================================================================
+    # Document Management (replaces MongoDB)
+    # =========================================================================
+
+    async def store_document(
+        self,
+        document_id: str,
+        filename: str,
+        file_type: str,
+        file_size: Optional[int] = None,
+        metadata: Optional[dict] = None,
+    ) -> bool:
+        """Store document metadata."""
+        pool = _get_pool()
+        if not pool:
+            return False
+
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO documents (document_id, filename, file_type, file_size, metadata, status)
+                        VALUES (%s, %s, %s, %s, %s, 'processing')
+                        ON CONFLICT (document_id) DO UPDATE SET
+                            filename = EXCLUDED.filename,
+                            file_type = EXCLUDED.file_type,
+                            file_size = EXCLUDED.file_size,
+                            metadata = EXCLUDED.metadata,
+                            updated_at = CURRENT_TIMESTAMP;
+                    """, (document_id, filename, file_type, file_size, json.dumps(metadata or {})))
+                    conn.commit()
+                    return True
+        except Exception as e:
+            logger.error(f"Failed to store document: {e}")
+            return False
+
+    async def update_document_chunks(self, document_id: str, total_chunks: int) -> bool:
+        """Update document chunk count."""
+        pool = _get_pool()
+        if not pool:
+            return False
+
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        UPDATE documents SET total_chunks = %s, updated_at = CURRENT_TIMESTAMP
+                        WHERE document_id = %s;
+                    """, (total_chunks, document_id))
+                    conn.commit()
+                    return True
+        except Exception as e:
+            logger.error(f"Failed to update document chunks: {e}")
+            return False
+
+    async def mark_document_completed(self, document_id: str) -> bool:
+        """Mark document as fully processed."""
+        pool = _get_pool()
+        if not pool:
+            return False
+
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        UPDATE documents SET status = 'completed', updated_at = CURRENT_TIMESTAMP
+                        WHERE document_id = %s;
+                    """, (document_id,))
+                    conn.commit()
+                    return True
+        except Exception as e:
+            logger.error(f"Failed to mark document completed: {e}")
+            return False
+
+    async def get_documents(self) -> list[dict]:
+        """Get list of all documents."""
+        pool = _get_pool()
+        if not pool:
+            return []
+
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT document_id, filename, file_type, total_chunks, status, created_at, metadata
+                        FROM documents ORDER BY created_at DESC;
+                    """)
+                    return [
+                        {
+                            "document_id": row[0],
+                            "filename": row[1],
+                            "file_type": row[2],
+                            "total_chunks": row[3],
+                            "status": row[4],
+                            "created_at": row[5].isoformat() if row[5] else None,
+                            "metadata": row[6] or {},
+                        }
+                        for row in cur.fetchall()
+                    ]
+        except Exception as e:
+            logger.error(f"Failed to get documents: {e}")
+            return []
+
+    async def get_document(self, document_id: str) -> Optional[dict]:
+        """Get single document by ID."""
+        pool = _get_pool()
+        if not pool:
+            return None
+
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT document_id, filename, file_type, total_chunks, status, created_at, metadata
+                        FROM documents WHERE document_id = %s;
+                    """, (document_id,))
+                    row = cur.fetchone()
+                    if row:
+                        return {
+                            "document_id": row[0],
+                            "filename": row[1],
+                            "file_type": row[2],
+                            "total_chunks": row[3],
+                            "status": row[4],
+                            "created_at": row[5].isoformat() if row[5] else None,
+                            "metadata": row[6] or {},
+                        }
+                    return None
+        except Exception as e:
+            logger.error(f"Failed to get document: {e}")
+            return None
+
+    async def delete_document(self, document_id: str) -> bool:
+        """Delete document and all its chunks."""
+        pool = _get_pool()
+        if not pool:
+            return False
+
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("DELETE FROM documents WHERE document_id = %s;", (document_id,))
+                    conn.commit()
+                    return True
+        except Exception as e:
+            logger.error(f"Failed to delete document: {e}")
+            return False
+
+    async def get_document_chunks(self, document_id: str) -> list[dict]:
+        """Get all chunks for a document."""
+        pool = _get_pool()
+        if not pool:
+            return []
+
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT chunk_id, chunk_index, content, dsrp_extracted, metadata
+                        FROM document_embeddings
+                        WHERE document_id = %s
+                        ORDER BY chunk_index;
+                    """, (document_id,))
+                    return [
+                        {
+                            "chunk_id": row[0],
+                            "chunk_index": row[1],
+                            "content": row[2],
+                            "dsrp_extracted": row[3],
+                            "metadata": row[4] or {},
+                        }
+                        for row in cur.fetchall()
+                    ]
+        except Exception as e:
+            logger.error(f"Failed to get document chunks: {e}")
+            return []
+
+    async def get_chunk_by_id(self, chunk_id: str) -> Optional[dict]:
+        """Get a specific chunk by ID."""
+        pool = _get_pool()
+        if not pool:
+            return None
+
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT chunk_id, document_id, chunk_index, content, dsrp_extracted, metadata
+                        FROM document_embeddings WHERE chunk_id = %s;
+                    """, (chunk_id,))
+                    row = cur.fetchone()
+                    if row:
+                        return {
+                            "chunk_id": row[0],
+                            "document_id": row[1],
+                            "chunk_index": row[2],
+                            "content": row[3],
+                            "dsrp_extracted": row[4],
+                            "metadata": row[5] or {},
+                        }
+                    return None
+        except Exception as e:
+            logger.error(f"Failed to get chunk: {e}")
+            return None
+
+    async def mark_chunk_extracted(self, chunk_id: str) -> bool:
+        """Mark a chunk as having DSRP concepts extracted."""
+        pool = _get_pool()
+        if not pool:
+            return False
+
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        UPDATE document_embeddings SET dsrp_extracted = TRUE WHERE chunk_id = %s;
+                    """, (chunk_id,))
+                    conn.commit()
+                    return True
+        except Exception as e:
+            logger.error(f"Failed to mark chunk extracted: {e}")
+            return False
+
+    async def get_stats(self) -> dict:
+        """Get knowledge base statistics."""
+        pool = _get_pool()
+        if not pool:
+            return {"connected": False}
+
+        try:
+            with pool.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SELECT COUNT(*) FROM documents;")
+                    doc_count = cur.fetchone()[0]
+
+                    cur.execute("SELECT COUNT(*) FROM document_embeddings;")
+                    chunk_count = cur.fetchone()[0]
+
+                    cur.execute("SELECT COUNT(*) FROM document_embeddings WHERE dsrp_extracted = TRUE;")
+                    extracted_count = cur.fetchone()[0]
+
+                    cur.execute("SELECT COUNT(*) FROM concept_embeddings;")
+                    concept_count = cur.fetchone()[0]
+
+                    return {
+                        "connected": True,
+                        "documents": doc_count,
+                        "chunks": chunk_count,
+                        "dsrp_extracted": extracted_count,
+                        "concepts": concept_count,
+                        "embedding_dimensions": EMBEDDING_DIMENSIONS,
+                    }
+        except Exception as e:
+            logger.error(f"Failed to get stats: {e}")
+            return {"connected": False, "error": str(e)}
 
     # =========================================================================
     # Utility Methods

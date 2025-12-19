@@ -8,7 +8,7 @@ It processes documents through these stages:
 1. INGEST: Load PDF or text files from the inbox folder
 2. CHUNK: Split text into manageable pieces (500 tokens each)
 3. EMBED: Generate vector embeddings for semantic search
-4. STORE EPISODIC: Save chunks + embeddings to MongoDB
+4. STORE EPISODIC: Save chunks + embeddings to PostgreSQL/pgvector
 5. EXTRACT DSRP: Use Claude to identify DSRP patterns in each chunk
 6. STORE SEMANTIC: Save structured DSRP knowledge to TypeDB
 
@@ -70,7 +70,7 @@ except ImportError:
     pass
 
 # Our services
-from services.mongodb_service import MongoDBService
+from services.pgvector_service import PgVectorService
 from services.typedb_service import TypeDBService
 from prompts.dsrp_extraction import get_extraction_prompt, DSRP_OUTPUT_SCHEMA
 
@@ -122,7 +122,7 @@ class DSRPIngestionPipeline:
     The main pipeline class that orchestrates document ingestion.
 
     Think of this as an assembly line:
-    Document -> Chunks -> Embeddings -> MongoDB -> DSRP Extraction -> TypeDB
+    Document -> Chunks -> Embeddings -> PostgreSQL/pgvector -> DSRP Extraction -> TypeDB
     """
 
     def __init__(self):
@@ -151,9 +151,9 @@ class DSRPIngestionPipeline:
         self.embedding_model = SentenceTransformer(EMBEDDING_MODEL)
         logger.info(f"Embedding dimensions: {self.embedding_model.get_sentence_embedding_dimension()}")
 
-        # Initialize MongoDB (episodic memory)
-        logger.info("Connecting to MongoDB...")
-        self.mongodb = MongoDBService()
+        # Initialize PostgreSQL/pgvector (episodic memory)
+        logger.info("Connecting to PostgreSQL/pgvector...")
+        self.pgvector = PgVectorService()
 
         # Initialize TypeDB (semantic memory)
         logger.info("Connecting to TypeDB...")
@@ -246,8 +246,8 @@ class DSRPIngestionPipeline:
         chunks = self.text_splitter.split_text(text)
         logger.info(f"Split into {len(chunks)} chunks")
 
-        # Store document metadata in MongoDB
-        self.mongodb.store_document(
+        # Store document metadata in PostgreSQL
+        self.pgvector.store_document(
             document_id=document_id,
             filename=file_path.name,
             file_path=str(file_path),
@@ -279,8 +279,8 @@ class DSRPIngestionPipeline:
             # STEP 2: Generate embedding
             embedding = self.embedding_model.encode(chunk_text).tolist()
 
-            # STEP 3: Store in MongoDB (episodic memory)
-            self.mongodb.store_chunk(
+            # STEP 3: Store in PostgreSQL/pgvector (episodic memory)
+            self.pgvector.store_chunk(
                 chunk_id=chunk_id,
                 document_id=document_id,
                 chunk_number=i,
@@ -319,10 +319,10 @@ class DSRPIngestionPipeline:
                     previous_summary = dsrp_data.get("summary", "")
 
                     # Mark chunk as processed
-                    self.mongodb.mark_chunk_dsrp_extracted(chunk_id)
+                    self.pgvector.mark_chunk_dsrp_extracted(chunk_id)
 
         # Mark document as complete
-        self.mongodb.mark_document_completed(document_id)
+        self.pgvector.mark_document_completed(document_id)
 
         # Move file to processed folder
         processed_path = PROCESSED_DIR / f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{file_path.name}"
@@ -508,7 +508,7 @@ class DSRPIngestionPipeline:
 
     def close(self):
         """Clean up resources."""
-        self.mongodb.close()
+        self.pgvector.close()
         self.typedb.close()
         logger.info("Pipeline shutdown complete")
 

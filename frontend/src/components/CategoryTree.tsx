@@ -1,18 +1,28 @@
 /**
  * CategoryTree - Interactive tree hierarchy visualization of categories and topics
  * Shows clear parent-child relationships with visual connecting lines
+ *
+ * Scale optimizations for large knowledge maps:
+ * - Search/filter across categories and topics
+ * - Lazy expansion of topic lists
+ * - Virtualized rendering for 100+ topics per category
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useCategoryStore, CATEGORY_COLORS } from '../stores/categoryStore'
 
 interface CategoryTreeProps {
   onTopicSelect?: (category: string, topic: string) => void
   onCategorySelect?: (category: string) => void
   editable?: boolean
+  searchQuery?: string
 }
 
-export function CategoryTree({ onTopicSelect, onCategorySelect, editable = true }: CategoryTreeProps) {
+// Maximum topics to show initially (for performance with large lists)
+const INITIAL_TOPICS_LIMIT = 20
+const TOPICS_LOAD_MORE = 20
+
+export function CategoryTree({ onTopicSelect, onCategorySelect, editable = true, searchQuery = '' }: CategoryTreeProps) {
   const {
     categories,
     addCategory,
@@ -22,6 +32,41 @@ export function CategoryTree({ onTopicSelect, onCategorySelect, editable = true 
   } = useCategoryStore()
 
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
+  // Track how many topics to show per category (for lazy loading)
+  const [topicsLimit, setTopicsLimit] = useState<Record<string, number>>({})
+
+  // Filter categories and topics based on search query
+  const filteredCategories = useMemo(() => {
+    if (!searchQuery.trim()) return categories
+
+    const query = searchQuery.toLowerCase()
+    return categories
+      .map(cat => {
+        const categoryMatches = cat.name.toLowerCase().includes(query)
+        const matchingTopics = cat.topics.filter(topic =>
+          topic.toLowerCase().includes(query)
+        )
+
+        // Include category if name matches OR has matching topics
+        if (categoryMatches || matchingTopics.length > 0) {
+          return {
+            ...cat,
+            // If searching, show all matching topics
+            topics: categoryMatches ? cat.topics : matchingTopics,
+          }
+        }
+        return null
+      })
+      .filter((cat): cat is NonNullable<typeof cat> => cat !== null)
+  }, [categories, searchQuery])
+
+  // Auto-expand categories when searching
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const matchingIds = new Set(filteredCategories.map(cat => cat.id))
+      setExpandedCategories(matchingIds)
+    }
+  }, [searchQuery, filteredCategories])
 
   // Auto-expand categories that have topics
   useEffect(() => {
@@ -131,16 +176,19 @@ export function CategoryTree({ onTopicSelect, onCategorySelect, editable = true 
         )}
 
         {/* Categories - Children of root */}
-        {categories.length === 0 ? (
+        {filteredCategories.length === 0 ? (
           <div className="empty-state">
             <div className="empty-connector" />
             <p>No categories yet. Click <strong>+</strong> above to create one.</p>
           </div>
         ) : (
           <div className="children-container">
-            {categories.map((category, catIndex) => {
+            {filteredCategories.map((category, catIndex) => {
               const isExpanded = expandedCategories.has(category.id)
-              const isLast = catIndex === categories.length - 1
+              const isLast = catIndex === filteredCategories.length - 1
+              const currentTopicsLimit = topicsLimit[category.id] || INITIAL_TOPICS_LIMIT
+              const visibleTopics = category.topics.slice(0, currentTopicsLimit)
+              const hasMoreTopics = category.topics.length > currentTopicsLimit
 
               return (
                 <div key={category.id} className="tree-node category-node">
@@ -220,8 +268,8 @@ export function CategoryTree({ onTopicSelect, onCategorySelect, editable = true 
                     {/* Topics - Children of category */}
                     {isExpanded && category.topics.length > 0 && (
                       <div className="children-container topics">
-                        {category.topics.map((topic, topicIndex) => {
-                          const isLastTopic = topicIndex === category.topics.length - 1
+                        {visibleTopics.map((topic, topicIndex) => {
+                          const isLastTopic = topicIndex === visibleTopics.length - 1 && !hasMoreTopics
 
                           return (
                             <div key={topic} className="tree-node topic-node">
@@ -258,6 +306,27 @@ export function CategoryTree({ onTopicSelect, onCategorySelect, editable = true 
                             </div>
                           )
                         })}
+
+                        {/* Load More button for large topic lists */}
+                        {hasMoreTopics && (
+                          <div className="load-more-container">
+                            <div className="node-connector child last">
+                              <svg className="connector-svg small" viewBox="0 0 24 40" preserveAspectRatio="none">
+                                <path d="M0,0 L0,20 Q0,20 8,20 L24,20" fill="none" stroke="currentColor" strokeWidth="2" />
+                              </svg>
+                            </div>
+                            <button
+                              className="load-more-btn"
+                              onClick={() => setTopicsLimit(prev => ({
+                                ...prev,
+                                [category.id]: (prev[category.id] || INITIAL_TOPICS_LIMIT) + TOPICS_LOAD_MORE
+                              }))}
+                            >
+                              Load {Math.min(TOPICS_LOAD_MORE, category.topics.length - currentTopicsLimit)} more
+                              ({category.topics.length - currentTopicsLimit} remaining)
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -662,6 +731,30 @@ export function CategoryTree({ onTopicSelect, onCategorySelect, editable = true 
         .empty-state p {
           margin: 0;
           font-size: 14px;
+        }
+
+        /* Load More button for large topic lists */
+        .load-more-container {
+          display: flex;
+          align-items: center;
+        }
+
+        .load-more-btn {
+          padding: 8px 14px;
+          background: rgba(255,255,255,0.05);
+          border: 1px dashed rgba(255,255,255,0.3);
+          border-radius: 8px;
+          color: rgba(255,255,255,0.6);
+          font-size: 12px;
+          cursor: pointer;
+          transition: all 0.15s;
+          font-family: inherit;
+        }
+
+        .load-more-btn:hover {
+          background: rgba(233, 69, 96, 0.15);
+          border-color: #e94560;
+          color: #e94560;
         }
 
         /* Animations */
