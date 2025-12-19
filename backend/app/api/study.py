@@ -53,6 +53,7 @@ class ReflectionRequest(BaseModel):
     session_id: str
     text: str
     analysis_depth: str = "standard"  # quick, standard, deep
+    use_ai: bool = True  # Set to False for fast mock analysis
 
 
 class MetacognitionRequest(BaseModel):
@@ -164,8 +165,48 @@ async def step_reflection(request: ReflectionRequest):
     - Summary Agent: Hierarchical summaries
     - Structure Agent: Document organization
     - DSRP Agents: 8 moves analysis on key concepts
+
+    Set use_ai=False for fast mock analysis (no AI calls).
     """
     orchestrator = get_study_orchestrator()
+
+    # Fast mock mode - no AI calls
+    if not request.use_ai:
+        import re
+        # Extract simple concepts from text using regex
+        words = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', request.text)
+        concepts = list(set(words))[:10]
+
+        # Create simple summary from first 200 chars
+        summary_text = request.text[:200].strip()
+        if len(request.text) > 200:
+            summary_text += "..."
+
+        return {
+            "step": "reflection",
+            "source_name": "Quick Analysis",
+            "summary": {
+                "executive_summary": summary_text,
+                "key_themes": concepts[:5],
+                "concepts": [{"name": c, "importance": "medium"} for c in concepts],
+            },
+            "structure": {
+                "document_type": "text",
+                "sections": ["Main Content"],
+            },
+            "concepts": concepts,
+            "dsrp_analyses": [
+                {
+                    "concept": c,
+                    "move": "is-is-not",
+                    "pattern": "D",
+                    "analysis": f"Quick analysis of {c}"
+                }
+                for c in concepts[:5]
+            ],
+            "status": "complete",
+            "mode": "fast_mock"
+        }
 
     try:
         result = await orchestrator.step_reflection(

@@ -32,6 +32,7 @@ export function ReflectionStep({ sessionId, text, sourceName, onComplete }: Refl
   const [result, setResult] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [analysisDepth, setAnalysisDepth] = useState<'quick' | 'standard' | 'deep'>('standard')
+  const [useAI, setUseAI] = useState(false) // Default to fast mode
 
   const startAnalysis = useCallback(async () => {
     setIsAnalyzing(true)
@@ -83,6 +84,7 @@ export function ReflectionStep({ sessionId, text, sourceName, onComplete }: Refl
           session_id: sessionId,
           text: text,
           analysis_depth: analysisDepth,
+          use_ai: useAI,
         }),
       })
 
@@ -104,7 +106,7 @@ export function ReflectionStep({ sessionId, text, sourceName, onComplete }: Refl
     } finally {
       setIsAnalyzing(false)
     }
-  }, [sessionId, text, analysisDepth])
+  }, [sessionId, text, analysisDepth, useAI])
 
   const handleComplete = useCallback(() => {
     if (result) {
@@ -139,6 +141,7 @@ export function ReflectionStep({ sessionId, text, sourceName, onComplete }: Refl
                   key={depth}
                   className={`depth-btn ${analysisDepth === depth ? 'selected' : ''}`}
                   onClick={() => setAnalysisDepth(depth)}
+                  disabled={!useAI}
                 >
                   <span className="depth-name">{depth.charAt(0).toUpperCase() + depth.slice(1)}</span>
                   <span className="depth-desc">
@@ -149,6 +152,23 @@ export function ReflectionStep({ sessionId, text, sourceName, onComplete }: Refl
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="ai-toggle">
+            <label className="toggle-label">
+              <input
+                type="checkbox"
+                checked={useAI}
+                onChange={(e) => setUseAI(e.target.checked)}
+              />
+              <span className="toggle-switch"></span>
+              <span className="toggle-text">
+                {useAI ? 'AI Analysis (slower, more accurate)' : 'Fast Mode (instant, basic extraction)'}
+              </span>
+            </label>
+            {!useAI && (
+              <p className="ai-hint">Fast mode extracts concepts without AI. Enable AI for deeper DSRP analysis.</p>
+            )}
           </div>
 
           <div className="moves-preview">
@@ -347,6 +367,69 @@ export function ReflectionStep({ sessionId, text, sourceName, onComplete }: Refl
           display: block;
           font-size: 0.75rem;
           opacity: 0.7;
+        }
+
+        .depth-btn:disabled {
+          opacity: 0.4;
+          cursor: not-allowed;
+        }
+
+        .ai-toggle {
+          margin-top: 20px;
+          padding: 16px;
+          background: rgba(0, 0, 0, 0.2);
+          border-radius: 12px;
+        }
+
+        .toggle-label {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          cursor: pointer;
+        }
+
+        .toggle-label input {
+          display: none;
+        }
+
+        .toggle-switch {
+          width: 48px;
+          height: 26px;
+          background: rgba(255, 255, 255, 0.2);
+          border-radius: 13px;
+          position: relative;
+          transition: all 0.3s;
+        }
+
+        .toggle-switch::after {
+          content: '';
+          position: absolute;
+          width: 22px;
+          height: 22px;
+          background: white;
+          border-radius: 50%;
+          top: 2px;
+          left: 2px;
+          transition: all 0.3s;
+        }
+
+        .toggle-label input:checked + .toggle-switch {
+          background: #e94560;
+        }
+
+        .toggle-label input:checked + .toggle-switch::after {
+          left: 24px;
+        }
+
+        .toggle-text {
+          font-size: 0.9rem;
+          color: rgba(255, 255, 255, 0.8);
+        }
+
+        .ai-hint {
+          margin: 8px 0 0;
+          font-size: 0.75rem;
+          color: rgba(255, 255, 255, 0.5);
         }
 
         .moves-preview {
