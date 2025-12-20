@@ -275,8 +275,9 @@ class GeminiProvider(BaseAIProvider):
             if not api_key:
                 raise ValueError("GOOGLE_API_KEY or GEMINI_API_KEY not set")
             genai.configure(api_key=api_key)
+            # Use gemini-1.5-flash for better rate limits on free tier
             self.model = genai.GenerativeModel(
-                model_name="models/gemini-2.0-flash",
+                model_name="gemini-1.5-flash",
                 system_instruction=DSRP_SYSTEM_PROMPT,
             )
             self._available = True
